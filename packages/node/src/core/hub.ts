@@ -223,13 +223,25 @@ export function createHub(config: HubConfig): Hub {
   const adapterFactory = (
     provider: Provider,
     entitlement?: EntitlementContext,
-  ): ProviderAdapter | undefined => {
+  ): ProviderAdapter => {
     if (!entitlement?.apiKey) {
-      return adapters[provider];
+      const adapter = adapters[provider];
+      if (!adapter) {
+        throw new LLMHubError({
+          kind: ErrorKind.Validation,
+          message: `Provider ${provider} is not configured`,
+          provider,
+        });
+      }
+      return adapter;
     }
     const baseConfig = config.providers[provider];
     if (!baseConfig) {
-      return undefined;
+      throw new LLMHubError({
+        kind: ErrorKind.Validation,
+        message: `Provider ${provider} is not configured`,
+        provider,
+      });
     }
     switch (provider) {
       case Provider.OpenAI:
