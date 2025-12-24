@@ -16,8 +16,12 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "pnpm build",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "refresh:models": "tsx scripts/refreshCuratedModels.ts"
