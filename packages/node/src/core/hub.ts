@@ -253,7 +253,10 @@ export function createHub(config: HubConfig): Hub {
           config.httpClient,
         );
       default:
-        return undefined;
+        throw new LLMHubError({
+          kind: ErrorKind.Validation,
+          message: `Provider ${provider} is not configured`,
+        });
     }
   };
 
