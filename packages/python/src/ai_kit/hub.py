@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Dict
+from typing import Callable, Dict
 
 from .catalog import CatalogAdapter, load_catalog_models
 from .errors import ErrorKind, KitErrorPayload, InferenceKitError, to_kit_error
@@ -34,6 +34,8 @@ from .providers import (
 class KitConfig:
     providers: Dict[Provider, object]
     registry_ttl_seconds: int = 1800
+    adapters: Dict[Provider, object] | None = None
+    adapter_factory: Callable[[Provider, EntitlementContext | None], object] | None = None
 
 
 class _KeyPool:
@@ -52,15 +54,23 @@ class _KeyPool:
 class Kit:
     def __init__(self, config: KitConfig) -> None:
         catalog_models = load_catalog_models()
-        if not config.providers and not catalog_models:
+        if (
+            not config.providers
+            and not config.adapters
+            and not config.adapter_factory
+            and not catalog_models
+        ):
             raise InferenceKitError(
                 KitErrorPayload(
                     kind=ErrorKind.VALIDATION,
-                    message="At least one provider configuration is required",
+                    message="At least one provider configuration or adapter is required",
                 )
             )
         self._providers, self._key_pools = self._prepare_providers(config.providers)
         self._adapters = self._build_adapters(self._providers)
+        if config.adapters:
+            self._adapters.update(config.adapters)
+        self._external_adapter_factory = config.adapter_factory
         if catalog_models:
             self._adapters["catalog"] = CatalogAdapter(catalog_models)
         self._registry = ModelRegistry(
@@ -252,6 +262,10 @@ class Kit:
     def _adapter_factory(
         self, provider: Provider, entitlement: EntitlementContext | None
     ):
+        if self._external_adapter_factory:
+            adapter = self._external_adapter_factory(provider, entitlement)
+            if adapter is not None:
+                return adapter
         if provider == "catalog":
             return self._adapters.get(provider)
         if not entitlement or not entitlement.apiKey:

@@ -273,15 +273,17 @@ async function* attachCostToStream(
 }
 
 export function createKit(config: KitConfig): Kit {
-  if (!config.providers || Object.keys(config.providers).length === 0) {
+  const providerCount = Object.keys(config.providers ?? {}).length;
+  const adapterCount = Object.keys(config.adapters ?? {}).length;
+  if (providerCount === 0 && adapterCount === 0 && !config.adapterFactory) {
     throw new InferenceKitError({
       kind: ErrorKind.Validation,
-      message: "At least one provider configuration is required",
+      message: "At least one provider configuration or adapter is required",
     });
   }
-  const adapters: AdapterMap = {};
+  const adapters: AdapterMap = { ...(config.adapters ?? {}) };
   const keyPools = new Map<Provider, KeyPool>();
-  if (config.providers[Provider.OpenAI]) {
+  if (config.providers[Provider.OpenAI] && !adapters[Provider.OpenAI]) {
     const providerConfig = config.providers[Provider.OpenAI]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
@@ -296,7 +298,7 @@ export function createKit(config: KitConfig): Kit {
     );
     keyPools.set(Provider.OpenAI, new KeyPool(keys));
   }
-  if (config.providers[Provider.Anthropic]) {
+  if (config.providers[Provider.Anthropic] && !adapters[Provider.Anthropic]) {
     const providerConfig = config.providers[Provider.Anthropic]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
@@ -311,7 +313,7 @@ export function createKit(config: KitConfig): Kit {
     );
     keyPools.set(Provider.Anthropic, new KeyPool(keys));
   }
-  if (config.providers[Provider.XAI]) {
+  if (config.providers[Provider.XAI] && !adapters[Provider.XAI]) {
     const providerConfig = config.providers[Provider.XAI]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
@@ -326,7 +328,7 @@ export function createKit(config: KitConfig): Kit {
     );
     keyPools.set(Provider.XAI, new KeyPool(keys));
   }
-  if (config.providers[Provider.Google]) {
+  if (config.providers[Provider.Google] && !adapters[Provider.Google]) {
     const providerConfig = config.providers[Provider.Google]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
@@ -342,7 +344,7 @@ export function createKit(config: KitConfig): Kit {
     keyPools.set(Provider.Google, new KeyPool(keys));
   }
 
-  const adapterFactory = (
+  const baseAdapterFactory = (
     provider: Provider,
     entitlement?: EntitlementContext,
   ): ProviderAdapter => {
@@ -392,6 +394,17 @@ export function createKit(config: KitConfig): Kit {
           message: `Provider ${provider} is not configured`,
         });
     }
+  };
+
+  const adapterFactory = (
+    provider: Provider,
+    entitlement?: EntitlementContext,
+  ): ProviderAdapter | undefined => {
+    const adapter = config.adapterFactory?.(provider, entitlement);
+    if (adapter) {
+      return adapter;
+    }
+    return baseAdapterFactory(provider, entitlement);
   };
 
   const registry = new ModelRegistry(

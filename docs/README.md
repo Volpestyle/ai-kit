@@ -35,3 +35,4 @@ handlers and Python ships an ASGI adapter that format `event: chunk` and `event:
 ## Related docs
 - HTTP API: `docs/http-api.md`
 - OpenAPI spec: `servers/openapi.yaml`
+- Deterministic testing: `docs/testing.md`

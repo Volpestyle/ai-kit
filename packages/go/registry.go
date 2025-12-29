@@ -35,8 +35,8 @@ type learnedKey struct {
 }
 
 type modelRegistry struct {
-	adapters    map[Provider]adapter
-	factory     adapterFactory
+	adapters    map[Provider]ProviderAdapter
+	factory     AdapterFactory
 	ttl         time.Duration
 	learnedTTL  time.Duration
 	cache       map[registryKey]registryEntry
@@ -44,7 +44,7 @@ type modelRegistry struct {
 	mu          sync.RWMutex
 }
 
-func newModelRegistry(adapters map[Provider]adapter, ttl time.Duration, factory adapterFactory) *modelRegistry {
+func newModelRegistry(adapters map[Provider]ProviderAdapter, ttl time.Duration, factory AdapterFactory) *modelRegistry {
 	return &modelRegistry{
 		adapters:   adapters,
 		factory:    factory,
@@ -194,7 +194,7 @@ func (r *modelRegistry) fetchAndCache(ctx context.Context, provider Provider, en
 	return entry, nil
 }
 
-func (r *modelRegistry) adapterFor(provider Provider, entitlement *EntitlementContext) (adapter, error) {
+func (r *modelRegistry) adapterFor(provider Provider, entitlement *EntitlementContext) (ProviderAdapter, error) {
 	if r.factory != nil {
 		return r.factory(provider, entitlement)
 	}

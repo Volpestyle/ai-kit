@@ -138,7 +138,7 @@ type toolState struct {
 	ArgumentsJSON string
 }
 
-func newOpenAIAdapter(cfg *OpenAIConfig, client *http.Client, provider Provider) adapter {
+func newOpenAIAdapter(cfg *OpenAIConfig, client *http.Client, provider Provider) ProviderAdapter {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.openai.com"

@@ -38,7 +38,7 @@ type geminiResponse struct {
 	} `json:"usageMetadata"`
 }
 
-func newGoogleAdapter(cfg *GoogleConfig, client *http.Client) adapter {
+func newGoogleAdapter(cfg *GoogleConfig, client *http.Client) ProviderAdapter {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://generativelanguage.googleapis.com"

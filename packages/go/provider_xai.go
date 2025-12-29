@@ -8,12 +8,12 @@ import (
 const xaiCompatibilityKey = "xai:compatibility"
 
 type xaiAdapter struct {
-	openai    adapter
-	anthropic adapter
+	openai    ProviderAdapter
+	anthropic ProviderAdapter
 	mode      string
 }
 
-func newXAIAdapter(cfg *XAIConfig, client *http.Client) adapter {
+func newXAIAdapter(cfg *XAIConfig, client *http.Client) ProviderAdapter {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.x.ai"
@@ -64,7 +64,7 @@ func (x *xaiAdapter) Stream(ctx context.Context, in GenerateInput) (<-chan Strea
 	return adapter.Stream(ctx, in)
 }
 
-func (x *xaiAdapter) selectAdapter(in GenerateInput) adapter {
+func (x *xaiAdapter) selectAdapter(in GenerateInput) ProviderAdapter {
 	mode := x.mode
 	if in.Metadata != nil {
 		if value, ok := in.Metadata[xaiCompatibilityKey]; ok {

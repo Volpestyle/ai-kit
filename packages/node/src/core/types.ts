@@ -1,3 +1,5 @@
+import type { AdapterMap, ProviderAdapter } from "./provider.js";
+
 export enum Provider {
   OpenAI = "openai",
   Anthropic = "anthropic",
@@ -366,7 +368,14 @@ export interface KitConfig {
   registry?: {
     ttlMs?: number;
   };
+  adapters?: AdapterMap;
+  adapterFactory?: AdapterFactory;
 }
+
+export type AdapterFactory = (
+  provider: Provider,
+  entitlement?: EntitlementContext,
+) => ProviderAdapter | undefined;
 
 export interface Kit {
   listModels(params?: ListModelsParams): Promise<ModelMetadata[]>;

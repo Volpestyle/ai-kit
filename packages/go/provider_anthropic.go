@@ -57,7 +57,7 @@ type anthropicStreamEvent struct {
 	} `json:"message"`
 }
 
-func newAnthropicAdapter(cfg *AnthropicConfig, client *http.Client, provider Provider) adapter {
+func newAnthropicAdapter(cfg *AnthropicConfig, client *http.Client, provider Provider) ProviderAdapter {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.anthropic.com"

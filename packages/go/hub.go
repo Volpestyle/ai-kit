@@ -15,6 +15,8 @@ type Config struct {
 	Google      *GoogleConfig
 	HTTPClient  *http.Client
 	RegistryTTL time.Duration
+	Adapters    map[Provider]ProviderAdapter
+	AdapterFactory AdapterFactory
 }
 
 type OpenAIConfig struct {
@@ -45,7 +47,7 @@ type GoogleConfig struct {
 	BaseURL string
 }
 
-type adapter interface {
+type ProviderAdapter interface {
 	ListModels(ctx context.Context) ([]ModelMetadata, error)
 	Generate(ctx context.Context, in GenerateInput) (GenerateOutput, error)
 	GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error)
@@ -53,24 +55,30 @@ type adapter interface {
 	Stream(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error)
 }
 
-type adapterFactory func(provider Provider, entitlement *EntitlementContext) (adapter, error)
+type AdapterFactory func(provider Provider, entitlement *EntitlementContext) (ProviderAdapter, error)
 
 type Kit struct {
-	adapters map[Provider]adapter
+	adapters map[Provider]ProviderAdapter
 	registry *modelRegistry
-	factory  adapterFactory
+	factory  AdapterFactory
 	keyPools map[Provider]*keyPool
 }
 
 func New(config Config) (*Kit, error) {
-	adapters := make(map[Provider]adapter)
+	adapters := make(map[Provider]ProviderAdapter)
 	keyPools := make(map[Provider]*keyPool)
 	client := config.HTTPClient
 	if client == nil {
 		client = http.DefaultClient
 	}
 
-	if config.OpenAI != nil {
+	for provider, adapter := range config.Adapters {
+		if adapter != nil {
+			adapters[provider] = adapter
+		}
+	}
+
+	if config.OpenAI != nil && adapters[ProviderOpenAI] == nil {
 		keys := normalizeKeys(config.OpenAI.APIKey, config.OpenAI.APIKeys)
 		if len(keys) == 0 {
 			return nil, fmt.Errorf("openai api key is required")
@@ -80,7 +88,7 @@ func New(config Config) (*Kit, error) {
 		adapters[ProviderOpenAI] = newOpenAIAdapter(&cfg, client, ProviderOpenAI)
 		keyPools[ProviderOpenAI] = newKeyPool(keys)
 	}
-	if config.Anthropic != nil {
+	if config.Anthropic != nil && adapters[ProviderAnthropic] == nil {
 		keys := normalizeKeys(config.Anthropic.APIKey, config.Anthropic.APIKeys)
 		if len(keys) == 0 {
 			return nil, fmt.Errorf("anthropic api key is required")
@@ -90,7 +98,7 @@ func New(config Config) (*Kit, error) {
 		adapters[ProviderAnthropic] = newAnthropicAdapter(&cfg, client, ProviderAnthropic)
 		keyPools[ProviderAnthropic] = newKeyPool(keys)
 	}
-	if config.XAI != nil {
+	if config.XAI != nil && adapters[ProviderXAI] == nil {
 		keys := normalizeKeys(config.XAI.APIKey, config.XAI.APIKeys)
 		if len(keys) == 0 {
 			return nil, fmt.Errorf("xai api key is required")
@@ -100,7 +108,7 @@ func New(config Config) (*Kit, error) {
 		adapters[ProviderXAI] = newXAIAdapter(&cfg, client)
 		keyPools[ProviderXAI] = newKeyPool(keys)
 	}
-	if config.Google != nil {
+	if config.Google != nil && adapters[ProviderGoogle] == nil {
 		keys := normalizeKeys(config.Google.APIKey, config.Google.APIKeys)
 		if len(keys) == 0 {
 			return nil, fmt.Errorf("google api key is required")
@@ -110,17 +118,20 @@ func New(config Config) (*Kit, error) {
 		adapters[ProviderGoogle] = newGoogleAdapter(&cfg, client)
 		keyPools[ProviderGoogle] = newKeyPool(keys)
 	}
-	if catalog := newCatalogAdapter(); catalog != nil {
+	if catalog := newCatalogAdapter(); catalog != nil && adapters[ProviderCatalog] == nil {
 		adapters[ProviderCatalog] = catalog
 	}
-	if len(adapters) == 0 {
-		return nil, fmt.Errorf("at least one provider config is required")
+	if len(adapters) == 0 && config.AdapterFactory == nil {
+		return nil, fmt.Errorf("at least one provider config or adapter is required")
 	}
 	ttl := config.RegistryTTL
 	if ttl == 0 {
 		ttl = 30 * time.Minute
 	}
-	factory := newAdapterFactory(config, client, adapters)
+	factory := config.AdapterFactory
+	if factory == nil {
+		factory = newAdapterFactory(config, client, adapters)
+	}
 	registry := newModelRegistry(adapters, ttl, factory)
 	return &Kit{
 		adapters: adapters,
@@ -290,8 +301,8 @@ func attachCostToStream(provider Provider, model string, stream <-chan StreamChu
 	return out
 }
 
-func newAdapterFactory(config Config, client *http.Client, adapters map[Provider]adapter) adapterFactory {
-	return func(provider Provider, entitlement *EntitlementContext) (adapter, error) {
+func newAdapterFactory(config Config, client *http.Client, adapters map[Provider]ProviderAdapter) AdapterFactory {
+	return func(provider Provider, entitlement *EntitlementContext) (ProviderAdapter, error) {
 		if provider == ProviderCatalog {
 			if adapter, ok := adapters[provider]; ok {
 				return adapter, nil

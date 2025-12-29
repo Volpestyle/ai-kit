@@ -148,4 +148,4 @@ app.get("/provider-models", handlers.models());
 app.listen(3000);
 ```
 
-More details live in `docs/README.md`.
+More details live in `docs/README.md`. Testing fixtures are documented in `docs/testing.md`.

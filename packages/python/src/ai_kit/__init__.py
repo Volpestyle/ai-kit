@@ -33,6 +33,13 @@ from .providers import (
     XAIConfig,
 )
 from .http_asgi import create_asgi_app
+from .testing import (
+    FixtureAdapter,
+    FixtureEntry,
+    FixtureKeyInput,
+    build_stream_chunks,
+    fixture_key,
+)
 
 __all__ = [
     "Kit",
@@ -68,4 +75,9 @@ __all__ = [
     "XAIAdapter",
     "XAIConfig",
     "create_asgi_app",
+    "FixtureAdapter",
+    "FixtureEntry",
+    "FixtureKeyInput",
+    "build_stream_chunks",
+    "fixture_key",
 ]
