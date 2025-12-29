@@ -21,7 +21,7 @@ import {
   StreamChunk,
 } from "./types.js";
 import { ErrorKind } from "./types.js";
-import { LLMHubError, toHubError } from "./errors.js";
+import { InferenceKitError, toHubError } from "./errors.js";
 import { estimateCost } from "./pricing.js";
 
 class KeyPool {
@@ -114,7 +114,7 @@ class DefaultHub implements Hub {
     }
     const adapter = this.requireAdapter(input.provider);
     if (!adapter.generateImage) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: `Provider ${input.provider} does not support image generation`,
         provider: input.provider,
@@ -138,7 +138,7 @@ class DefaultHub implements Hub {
     }
     const adapter = this.requireAdapter(input.provider);
     if (!adapter.generateMesh) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: `Provider ${input.provider} does not support mesh generation`,
         provider: input.provider,
@@ -178,7 +178,7 @@ class DefaultHub implements Hub {
   ): Promise<ImageGenerateOutput> {
     const adapter = this.requireAdapter(input.provider, entitlement);
     if (!adapter.generateImage) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: `Provider ${input.provider} does not support image generation`,
         provider: input.provider,
@@ -199,7 +199,7 @@ class DefaultHub implements Hub {
   ): Promise<MeshGenerateOutput> {
     const adapter = this.requireAdapter(input.provider, entitlement);
     if (!adapter.generateMesh) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: `Provider ${input.provider} does not support mesh generation`,
         provider: input.provider,
@@ -221,7 +221,7 @@ class DefaultHub implements Hub {
     const adapter =
       this.adapterFactory?.(provider, entitlement) ?? this.adapters[provider];
     if (!adapter) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: `Provider ${provider} is not configured`,
         provider,
@@ -274,7 +274,7 @@ async function* attachCostToStream(
 
 export function createHub(config: HubConfig): Hub {
   if (!config.providers || Object.keys(config.providers).length === 0) {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "At least one provider configuration is required",
     });
@@ -285,7 +285,7 @@ export function createHub(config: HubConfig): Hub {
     const providerConfig = config.providers[Provider.OpenAI]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "OpenAI api key is required",
       });
@@ -300,7 +300,7 @@ export function createHub(config: HubConfig): Hub {
     const providerConfig = config.providers[Provider.Anthropic]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "Anthropic api key is required",
       });
@@ -315,7 +315,7 @@ export function createHub(config: HubConfig): Hub {
     const providerConfig = config.providers[Provider.XAI]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "xAI api key is required",
       });
@@ -330,7 +330,7 @@ export function createHub(config: HubConfig): Hub {
     const providerConfig = config.providers[Provider.Google]!;
     const keys = normalizeKeys(providerConfig.apiKey, providerConfig.apiKeys);
     if (!keys.length) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "Google api key is required",
       });
@@ -349,7 +349,7 @@ export function createHub(config: HubConfig): Hub {
     if (!entitlement?.apiKey) {
       const adapter = adapters[provider];
       if (!adapter) {
-        throw new LLMHubError({
+        throw new InferenceKitError({
           kind: ErrorKind.Validation,
           message: `Provider ${provider} is not configured`,
           provider,
@@ -359,7 +359,7 @@ export function createHub(config: HubConfig): Hub {
     }
     const baseConfig = config.providers[provider];
     if (!baseConfig) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: `Provider ${provider} is not configured`,
         provider,
@@ -387,7 +387,7 @@ export function createHub(config: HubConfig): Hub {
           config.httpClient,
         );
       default:
-        throw new LLMHubError({
+        throw new InferenceKitError({
           kind: ErrorKind.Validation,
           message: `Provider ${provider} is not configured`,
         });

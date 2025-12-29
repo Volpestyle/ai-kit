@@ -14,7 +14,7 @@ import {
   Usage,
   FetchLike,
 } from "../core/types.js";
-import { LLMHubError } from "../core/errors.js";
+import { InferenceKitError } from "../core/errors.js";
 import { ErrorKind } from "../core/types.js";
 import { streamSSE, parseEventData } from "../core/stream.js";
 
@@ -196,7 +196,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     input: ImageGenerateInput,
   ): Promise<ImageGenerateOutput> {
     if (input.inputImages?.length) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: "OpenAI image edits are not supported in this adapter",
         provider: this.provider,
@@ -214,7 +214,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     });
     const image = response.data?.[0];
     if (!image?.b64_json) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unknown,
         message: "OpenAI image response missing base64 data",
         provider: this.provider,
@@ -536,7 +536,7 @@ export class OpenAIAdapter implements ProviderAdapter {
   ): Promise<Response> {
     const fetchImpl = this.fetchImpl ?? globalThis.fetch;
     if (!fetchImpl) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: "global fetch is not available",
         provider: this.provider,
@@ -557,7 +557,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     });
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "");
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind:
           response.status === 401 || response.status === 403
             ? ErrorKind.ProviderAuth

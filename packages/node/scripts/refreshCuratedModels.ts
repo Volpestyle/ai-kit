@@ -5,8 +5,10 @@ import { inspect } from "node:util";
 
 import dotenv from "dotenv";
 import { chromium } from "playwright";
+import type { BrowserContext } from "playwright";
 
 type Provider = "openai" | "anthropic" | "xai" | "google";
+type WaitUntilState = "load" | "domcontentloaded" | "networkidle";
 
 interface CuratedModel {
   id: string;
@@ -68,7 +70,7 @@ const PROVIDER_SOURCES: ProviderSource[] = [
     provider: "anthropic",
     pricingUrl:
       process.env.ANTHROPIC_PRICING_URL ??
-      "https://www.anthropic.com/pricing",
+      "https://platform.claude.com/docs/en/about-claude/pricing",
   },
   {
     provider: "xai",
@@ -316,10 +318,12 @@ function normalizeName(input?: string): string {
   return normalizeWhitespace(input).toLowerCase();
 }
 
-async function loadCuratedModels(): Promise<CuratedModel[]> {
-  const raw = await fs.readFile(curatedModelsPath, "utf-8");
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed) ? (parsed as CuratedModel[]) : [];
+function normalizeModelId(provider: Provider, modelId: string): string {
+  const prefix = `${provider}/`;
+  if (modelId.startsWith(prefix)) {
+    return modelId.slice(prefix.length);
+  }
+  return modelId;
 }
 
 async function saveCuratedModels(models: CuratedModel[]): Promise<void> {
@@ -342,30 +346,41 @@ function providerWaitSelector(provider: Provider): string | undefined {
   }
 }
 
+function providerWaitUntil(provider: Provider): WaitUntilState {
+  switch (provider) {
+    case "xai":
+      return "domcontentloaded";
+    default:
+      return "networkidle";
+  }
+}
+
 async function captureDomSnapshot(
+  context: BrowserContext,
   url: string,
   waitForSelector?: string,
+  waitUntil: WaitUntilState = "networkidle",
+  fallbackWaitUntil: WaitUntilState | null = "domcontentloaded",
 ): Promise<DomSnapshot> {
   const start = Date.now();
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  });
   const page = await context.newPage();
   let response: Awaited<ReturnType<typeof page.goto>> | null = null;
   try {
     response = await page.goto(url, {
-      waitUntil: "networkidle",
+      waitUntil,
       timeout: NAV_TIMEOUT_MS,
     });
   } catch (error) {
-    if ((error as { name?: string }).name !== "TimeoutError") {
+    if ((error as { name?: string }).name !== "TimeoutError" || !fallbackWaitUntil) {
       throw error;
     }
-    logVerbose("Network idle timeout; retrying with domcontentloaded", { url });
+    logVerbose("Page load timeout; retrying with fallback wait", {
+      url,
+      waitUntil,
+      fallbackWaitUntil,
+    });
     response = await page.goto(url, {
-      waitUntil: "domcontentloaded",
+      waitUntil: fallbackWaitUntil,
       timeout: NAV_TIMEOUT_MS,
     });
   }
@@ -419,8 +434,6 @@ async function captureDomSnapshot(
     }
   }
   await page.close();
-  await context.close();
-  await browser.close();
   const normalized = {
     ...snapshot,
     bodyText: bodyText.slice(0, MAX_TEXT_CHARS),
@@ -606,68 +619,94 @@ async function parsePricing(
   return JSON.parse(outputText) as ParsedPricing;
 }
 
-function findCuratedMatch(
-  models: CuratedModel[],
-  provider: Provider,
-  record: ParsedPricing["pricing"][number],
-): CuratedModel | undefined {
-  if (record.modelId) {
-    const direct = models.find(
-      (model) =>
-        model.provider === provider && normalizeName(model.id) === normalizeName(record.modelId),
-    );
-    if (direct) {
-      return direct;
-    }
-  }
-  const name = normalizeName(record.name);
-  if (!name) {
+function normalizeCapabilities(
+  input?: ParsedPricing["pricing"][number]["capabilities"] | null,
+): CuratedModel["capabilities"] | undefined {
+  if (!input) {
     return undefined;
   }
-  const matches = models.filter(
-    (model) =>
-      model.provider === provider &&
-      normalizeName(model.displayName ?? model.id) === name,
-  );
-  if (matches.length === 1) {
-    return matches[0];
+  const out: Record<string, boolean> = {};
+  for (const key of [
+    "text",
+    "vision",
+    "tool_use",
+    "structured_output",
+    "reasoning",
+  ] as const) {
+    const value = input[key];
+    if (value !== undefined && value !== null) {
+      out[key] = value;
+    }
   }
-  return undefined;
+  return Object.keys(out).length ? out : undefined;
 }
 
-function applyParsedRecord(
-  model: CuratedModel,
+function normalizeTokenPrices(
   record: ParsedPricing["pricing"][number],
-): CuratedModel {
-  const tokenPrices = { ...(model.tokenPrices ?? {}) };
-  if (record.inputPer1M !== undefined && record.inputPer1M !== null) {
-    tokenPrices.input = record.inputPer1M;
+): CuratedModel["tokenPrices"] | undefined {
+  const input = record.inputPer1M;
+  const output = record.outputPer1M;
+  if (input === undefined || input === null) {
+    if (output === undefined || output === null) {
+      return undefined;
+    }
   }
-  if (record.outputPer1M !== undefined && record.outputPer1M !== null) {
-    tokenPrices.output = record.outputPer1M;
-  }
-  const capabilities = record.capabilities
-    ? { ...(model.capabilities ?? {}), ...record.capabilities }
-    : model.capabilities;
   return {
-    ...model,
-    tokenPrices:
-      (record.inputPer1M !== undefined && record.inputPer1M !== null) ||
-      (record.outputPer1M !== undefined && record.outputPer1M !== null)
-        ? tokenPrices
-        : model.tokenPrices,
-    contextWindow:
-      record.contextWindow !== undefined && record.contextWindow !== null
-        ? record.contextWindow
-        : model.contextWindow,
-    capabilities,
+    ...(input !== undefined && input !== null ? { input } : {}),
+    ...(output !== undefined && output !== null ? { output } : {}),
   };
 }
 
+function mergeCuratedModel(
+  existing: CuratedModel,
+  record: ParsedPricing["pricing"][number],
+): CuratedModel {
+  const tokenPrices = normalizeTokenPrices(record);
+  const capabilities = normalizeCapabilities(record.capabilities);
+  return {
+    ...existing,
+    displayName: existing.displayName ?? record.name,
+    tokenPrices: tokenPrices
+      ? { ...(existing.tokenPrices ?? {}), ...tokenPrices }
+      : existing.tokenPrices,
+    contextWindow:
+      record.contextWindow !== undefined && record.contextWindow !== null
+        ? record.contextWindow
+        : existing.contextWindow,
+    capabilities: capabilities
+      ? { ...(existing.capabilities ?? {}), ...capabilities }
+      : existing.capabilities,
+  };
+}
+
+function recordToCuratedModel(
+  provider: Provider,
+  record: ParsedPricing["pricing"][number],
+): CuratedModel {
+  const tokenPrices = normalizeTokenPrices(record);
+  const capabilities = normalizeCapabilities(record.capabilities);
+  const modelId = record.modelId ? normalizeModelId(provider, record.modelId) : "";
+  const model: CuratedModel = {
+    id: modelId,
+    provider,
+    displayName: record.name,
+  };
+  if (tokenPrices) {
+    model.tokenPrices = tokenPrices;
+  }
+  if (record.contextWindow !== undefined && record.contextWindow !== null) {
+    model.contextWindow = record.contextWindow;
+  }
+  if (capabilities) {
+    model.capabilities = capabilities;
+  }
+  return model;
+}
+
 async function main() {
-  const curatedModels = await loadCuratedModels();
-  const updatedModels = [...curatedModels];
-  const missingMatches: string[] = [];
+  const updatedModels: CuratedModel[] = [];
+  const indexByKey = new Map<string, number>();
+  const skippedEntries: string[] = [];
   const matchedEntriesByProvider: Record<Provider, string[]> = {
     openai: [],
     anthropic: [],
@@ -675,64 +714,89 @@ async function main() {
     google: [],
   };
   let isFirstProvider = true;
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  });
 
-  for (const source of PROVIDER_SOURCES) {
-    if (!isFirstProvider) {
-      console.log("");
-    }
-    isFirstProvider = false;
-    logInfo(`Scraping ${source.provider} pricing`, { url: source.pricingUrl });
-    const waitForSelector = providerWaitSelector(source.provider);
-    const snapshot = await captureDomSnapshot(source.pricingUrl, waitForSelector);
-    if (
-      snapshot.bodyText.length < MIN_CONTENT_CHARS &&
-      !snapshot.tables.length &&
-      !(snapshot.nextData && snapshot.nextData.length) &&
-      !(snapshot.bodyHtml && snapshot.bodyHtml.length)
-    ) {
-      throw new Error(
-        `No DOM content captured for ${source.pricingUrl}. Try OPENAI_WAIT_FOR_SELECTOR (or provider-specific selector) or increase PRICING_RENDER_TIMEOUT_MS.`,
-      );
-    }
-    const parsed = await parsePricing(source.provider, source.pricingUrl, snapshot);
-    logVerbose("Parsed pricing entries", {
-      provider: source.provider,
-      entries: parsed.pricing.length,
-    });
-    for (const record of parsed.pricing) {
-      const match = findCuratedMatch(updatedModels, source.provider, record);
-      if (!match) {
-        missingMatches.push(`${source.provider}:${record.name}`);
-        continue;
+  try {
+    for (const source of PROVIDER_SOURCES) {
+      if (!isFirstProvider) {
+        console.log("");
       }
-      matchedEntriesByProvider[source.provider].push(
-        formatMatchedEntry(record, match),
+      isFirstProvider = false;
+      logInfo(`Scraping ${source.provider} pricing`, { url: source.pricingUrl });
+      const waitForSelector = providerWaitSelector(source.provider);
+      const waitUntil = providerWaitUntil(source.provider);
+      const fallbackWaitUntil = waitUntil === "domcontentloaded" ? null : "domcontentloaded";
+      const snapshot = await captureDomSnapshot(
+        context,
+        source.pricingUrl,
+        waitForSelector,
+        waitUntil,
+        fallbackWaitUntil,
       );
-      const index = updatedModels.findIndex(
-        (model) => model.provider === match.provider && model.id === match.id,
-      );
-      if (index >= 0) {
-        updatedModels[index] = applyParsedRecord(updatedModels[index], record);
+      if (
+        snapshot.bodyText.length < MIN_CONTENT_CHARS &&
+        !snapshot.tables.length &&
+        !(snapshot.nextData && snapshot.nextData.length) &&
+        !(snapshot.bodyHtml && snapshot.bodyHtml.length)
+      ) {
+        throw new Error(
+          `No DOM content captured for ${source.pricingUrl}. Try OPENAI_WAIT_FOR_SELECTOR (or provider-specific selector) or increase PRICING_RENDER_TIMEOUT_MS.`,
+        );
+      }
+      const parsed = await parsePricing(source.provider, source.pricingUrl, snapshot);
+      logVerbose("Parsed pricing entries", {
+        provider: source.provider,
+        entries: parsed.pricing.length,
+      });
+      for (const record of parsed.pricing) {
+        if (!record.modelId) {
+          skippedEntries.push(`${source.provider}:${record.name}`);
+          continue;
+        }
+        const normalizedId = normalizeModelId(source.provider, record.modelId);
+        const key = `${source.provider}:${normalizeName(normalizedId)}`;
+        const index = indexByKey.get(key);
+        if (index === undefined) {
+          const created = recordToCuratedModel(source.provider, record);
+          indexByKey.set(key, updatedModels.length);
+          updatedModels.push(created);
+          matchedEntriesByProvider[source.provider].push(
+            formatMatchedEntry(record, created),
+          );
+        } else {
+          const merged = mergeCuratedModel(updatedModels[index], record);
+          updatedModels[index] = merged;
+          matchedEntriesByProvider[source.provider].push(
+            formatMatchedEntry(record, merged),
+          );
+        }
+      }
+      const matchedEntries = matchedEntriesByProvider[source.provider];
+      if (matchedEntries.length) {
+        logVerbose("Matched pricing entries", {
+          provider: source.provider,
+          entries: matchedEntries.join("\n"),
+        });
+      } else {
+        logVerbose("Matched pricing entries", {
+          provider: source.provider,
+          entries: "none",
+        });
       }
     }
-    const matchedEntries = matchedEntriesByProvider[source.provider];
-    if (matchedEntries.length) {
-      logVerbose("Matched pricing entries", {
-        provider: source.provider,
-        entries: matchedEntries.join("\n"),
-      });
-    } else {
-      logVerbose("Matched pricing entries", {
-        provider: source.provider,
-        entries: "none",
-      });
-    }
+  } finally {
+    await context.close();
+    await browser.close();
   }
 
-  if (missingMatches.length) {
-    logWarn("No curated match for entries", {
-      count: missingMatches.length,
-      entries: missingMatches,
+  if (skippedEntries.length) {
+    logWarn("Skipped entries missing modelId", {
+      count: skippedEntries.length,
+      entries: skippedEntries,
     });
   }
   const totalMatched = Object.values(matchedEntriesByProvider).reduce(

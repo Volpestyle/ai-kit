@@ -1,6 +1,6 @@
 import { ErrorKind, HubErrorPayload, Provider } from "./types.js";
 
-export class LLMHubError extends Error {
+export class InferenceKitError extends Error {
   public readonly kind: ErrorKind;
   public readonly provider?: Provider;
   public readonly upstreamStatus?: number;
@@ -10,7 +10,7 @@ export class LLMHubError extends Error {
 
   constructor(payload: HubErrorPayload) {
     super(payload.message);
-    this.name = "LLMHubError";
+    this.name = "InferenceKitError";
     this.kind = payload.kind;
     this.provider = payload.provider;
     this.upstreamStatus = payload.upstreamStatus;
@@ -20,13 +20,13 @@ export class LLMHubError extends Error {
   }
 }
 
-export function toHubError(err: unknown): LLMHubError {
-  if (err instanceof LLMHubError) {
+export function toHubError(err: unknown): InferenceKitError {
+  if (err instanceof InferenceKitError) {
     return err;
   }
   const message =
     err instanceof Error ? err.message : "Unexpected provider error";
-  return new LLMHubError({
+  return new InferenceKitError({
     kind: ErrorKind.Unknown,
     message,
     cause: err,
@@ -39,8 +39,8 @@ export function ensureHubError(
   upstreamStatus?: number,
   upstreamCode?: string,
   requestId?: string,
-): LLMHubError {
-  return new LLMHubError({
+): InferenceKitError {
+  return new InferenceKitError({
     kind: classifyStatus(upstreamStatus),
     message,
     provider,

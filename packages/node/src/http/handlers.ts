@@ -6,7 +6,7 @@ import {
   MeshGenerateInput,
   Provider,
 } from "../core/types.js";
-import { toHubError, LLMHubError } from "../core/errors.js";
+import { toHubError, InferenceKitError } from "../core/errors.js";
 import { ErrorKind } from "../core/types.js";
 
 export interface RequestLike {
@@ -176,33 +176,33 @@ function normalizeGenerateInput(payload: unknown): GenerateInput {
     try {
       parsed = JSON.parse(parsed);
     } catch {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "Body must be valid JSON",
       });
     }
   }
   if (!parsed || typeof parsed !== "object") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "Request body must be a GenerateInput object",
     });
   }
   const input = parsed as Record<string, unknown>;
   if (typeof input.provider !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "provider is required and must be a string",
     });
   }
   if (typeof input.model !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "model is required and must be a string",
     });
   }
   if (!Array.isArray(input.messages)) {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "messages is required and must be an array",
     });
@@ -220,33 +220,33 @@ function normalizeImageInput(payload: unknown): ImageGenerateInput {
     try {
       parsed = JSON.parse(parsed);
     } catch {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "Body must be valid JSON",
       });
     }
   }
   if (!parsed || typeof parsed !== "object") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "Request body must be an ImageGenerateInput object",
     });
   }
   const input = parsed as Record<string, unknown>;
   if (typeof input.provider !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "provider is required and must be a string",
     });
   }
   if (typeof input.model !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "model is required and must be a string",
     });
   }
   if (typeof input.prompt !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "prompt is required and must be a string",
     });
@@ -264,33 +264,33 @@ function normalizeMeshInput(payload: unknown): MeshGenerateInput {
     try {
       parsed = JSON.parse(parsed);
     } catch {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Validation,
         message: "Body must be valid JSON",
       });
     }
   }
   if (!parsed || typeof parsed !== "object") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "Request body must be a MeshGenerateInput object",
     });
   }
   const input = parsed as Record<string, unknown>;
   if (typeof input.provider !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "provider is required and must be a string",
     });
   }
   if (typeof input.model !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "model is required and must be a string",
     });
   }
   if (typeof input.prompt !== "string") {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "prompt is required and must be a string",
     });
@@ -301,7 +301,7 @@ function normalizeMeshInput(payload: unknown): MeshGenerateInput {
 function parseQueryPayload(req: RequestLike): unknown {
   const raw = req.query?.payload;
   if (!raw) {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "stream endpoint expects ?payload=<json>",
     });
@@ -309,7 +309,7 @@ function parseQueryPayload(req: RequestLike): unknown {
   try {
     return JSON.parse(String(raw));
   } catch {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Validation,
       message: "Invalid JSON payload in query parameter",
     });
@@ -346,7 +346,7 @@ function sendSSEError(res: ResponseLike, err: unknown) {
   res.end?.();
 }
 
-function mapStatus(err: LLMHubError): number {
+function mapStatus(err: InferenceKitError): number {
   switch (err.kind) {
     case ErrorKind.Validation:
       return 400;

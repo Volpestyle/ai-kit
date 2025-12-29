@@ -11,7 +11,7 @@ import {
   ToolDefinition,
   Usage,
 } from "../core/types.js";
-import { LLMHubError } from "../core/errors.js";
+import { InferenceKitError } from "../core/errors.js";
 import { ErrorKind } from "../core/types.js";
 import { parseEventData, streamSSE } from "../core/stream.js";
 
@@ -294,7 +294,7 @@ export class AnthropicAdapter implements ProviderAdapter {
   private async fetchRaw(path: string, init: RequestInit & { useStructuredOutputsBeta?: boolean }): Promise<Response> {
     const fetchImpl = this.fetchImpl ?? globalThis.fetch;
     if (!fetchImpl) {
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind: ErrorKind.Unsupported,
         message: "global fetch is not available",
         provider: this.provider,
@@ -317,7 +317,7 @@ export class AnthropicAdapter implements ProviderAdapter {
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new LLMHubError({
+      throw new InferenceKitError({
         kind:
           response.status === 401 || response.status === 403
             ? ErrorKind.ProviderAuth

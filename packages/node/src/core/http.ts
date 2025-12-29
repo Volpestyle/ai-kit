@@ -1,5 +1,5 @@
 import { ErrorKind, FetchLike, Provider } from "./types.js";
-import { LLMHubError } from "./errors.js";
+import { InferenceKitError } from "./errors.js";
 
 export interface HttpRequestOptions {
   method?: string;
@@ -16,7 +16,7 @@ export async function httpRequest<T = unknown>(
 ): Promise<{ data: T; response: Response }> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   if (!fetchImpl) {
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: ErrorKind.Unsupported,
       message: "global fetch is not available; supply hubConfig.httpClient",
       provider: options.provider,
@@ -40,7 +40,7 @@ export async function httpRequest<T = unknown>(
 
   if (!response.ok) {
     const text = await safeReadText(response);
-    throw new LLMHubError({
+    throw new InferenceKitError({
       kind: classifyStatus(response.status),
       message: text || `Request failed with status ${response.status}`,
       provider: options.provider,
