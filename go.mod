@@ -1,3 +1,3 @@
-module github.com/Volpestyle/llmhub
+module github.com/Volpestyle/inference-kit
 
 go 1.22
