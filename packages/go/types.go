@@ -1,4 +1,4 @@
-package llmhub
+package inferencekit
 
 type Provider string
 
@@ -7,6 +7,7 @@ const (
 	ProviderAnthropic Provider = "anthropic"
 	ProviderXAI       Provider = "xai"
 	ProviderGoogle    Provider = "google"
+	ProviderCatalog   Provider = "catalog"
 )
 
 type ModelCapabilities struct {

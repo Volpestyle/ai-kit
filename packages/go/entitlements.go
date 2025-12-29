@@ -1,4 +1,4 @@
-package llmhub
+package inferencekit
 
 import (
 	"crypto/sha256"

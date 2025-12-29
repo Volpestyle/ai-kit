@@ -1,4 +1,4 @@
-package llmhub
+package inferencekit
 
 import (
 	"context"
@@ -109,6 +109,9 @@ func New(config Config) (*Hub, error) {
 		cfg.APIKey = keys[0]
 		adapters[ProviderGoogle] = newGoogleAdapter(&cfg, client)
 		keyPools[ProviderGoogle] = newKeyPool(keys)
+	}
+	if catalog := newCatalogAdapter(); catalog != nil {
+		adapters[ProviderCatalog] = catalog
 	}
 	if len(adapters) == 0 {
 		return nil, fmt.Errorf("at least one provider config is required")
@@ -289,6 +292,12 @@ func attachCostToStream(provider Provider, model string, stream <-chan StreamChu
 
 func newAdapterFactory(config Config, client *http.Client, adapters map[Provider]adapter) adapterFactory {
 	return func(provider Provider, entitlement *EntitlementContext) (adapter, error) {
+		if provider == ProviderCatalog {
+			if adapter, ok := adapters[provider]; ok {
+				return adapter, nil
+			}
+			return nil, fmt.Errorf("provider %s is not configured", provider)
+		}
 		if entitlement == nil || strings.TrimSpace(entitlement.APIKey) == "" {
 			if adapter, ok := adapters[provider]; ok {
 				return adapter, nil

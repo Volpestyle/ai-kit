@@ -1,4 +1,4 @@
-package llmhub
+package inferencekit
 
 import (
 	"context"
@@ -141,6 +141,8 @@ func parseProviders(value string) []Provider {
 			providers = append(providers, ProviderGoogle)
 		case string(ProviderXAI):
 			providers = append(providers, ProviderXAI)
+		case string(ProviderCatalog):
+			providers = append(providers, ProviderCatalog)
 		}
 	}
 	return providers

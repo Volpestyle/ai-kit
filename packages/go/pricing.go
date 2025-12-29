@@ -1,4 +1,4 @@
-package llmhub
+package inferencekit
 
 import (
 	"encoding/json"
