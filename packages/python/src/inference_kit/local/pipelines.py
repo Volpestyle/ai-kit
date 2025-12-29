@@ -13,6 +13,10 @@ def get_pipeline(task: str, model: str, device: object | None = None):
 
 @lru_cache(maxsize=4)
 def _get_pipeline_cached(task: str, model: str, device_str: str):
+    if task == "novel-view":
+        from .novel_view import get_novel_view_pipeline
+        return get_novel_view_pipeline(model, device_str)
+
     from transformers import pipeline as hf_pipeline
 
     trust_remote_code = os.getenv("INFERENCE_KIT_TRUST_REMOTE_CODE", "").strip().lower() in {

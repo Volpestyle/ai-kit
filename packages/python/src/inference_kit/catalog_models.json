@@ -52,6 +52,19 @@
     }
   },
   {
+    "id": "zero123-plus",
+    "displayName": "Zero123++",
+    "provider": "catalog",
+    "family": "views",
+    "capabilities": {
+      "text": false,
+      "vision": false,
+      "tool_use": false,
+      "structured_output": false,
+      "reasoning": false
+    }
+  },
+  {
     "id": "depth-anything-v2-small",
     "displayName": "Depth Anything v2 Small",
     "provider": "catalog",

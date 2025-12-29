@@ -20,3 +20,20 @@ REGISTRY.register(
     "depth-anything-v2-large",
     "depth-anything/Depth-Anything-V2-Large-hf",
 )
+
+REGISTRY.register(
+    "novel-view",
+    "zero123-plus",
+    "sudo-ai/zero123plus",
+    default=True,
+)
+REGISTRY.register(
+    "novel-view",
+    "stable-zero123",
+    "stabilityai/stable-zero123",
+)
+REGISTRY.register(
+    "novel-view",
+    "zero123",
+    "ashawkey/zero123",
+)
