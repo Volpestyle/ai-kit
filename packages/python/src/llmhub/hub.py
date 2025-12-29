@@ -5,8 +5,18 @@ from typing import Dict
 
 from .errors import ErrorKind, HubErrorPayload, LLMHubError, to_hub_error
 from .entitlements import fingerprint_api_key
+from .pricing import estimate_cost
 from .registry import ModelRegistry
-from .types import EntitlementContext, GenerateInput, GenerateOutput, Provider
+from .types import (
+    EntitlementContext,
+    GenerateInput,
+    GenerateOutput,
+    ImageGenerateInput,
+    ImageGenerateOutput,
+    MeshGenerateInput,
+    MeshGenerateOutput,
+    Provider,
+)
 from .providers import (
     AnthropicAdapter,
     AnthropicConfig,
@@ -67,7 +77,8 @@ class Hub:
             return self.generate_with_context(entitlement, input)
         adapter = self._require_adapter(input.provider)
         try:
-            return adapter.generate(input)
+            output = adapter.generate(input)
+            return _attach_cost(input, output)
         except Exception as err:
             hub_err = to_hub_error(err)
             self._registry.learn_model_unavailable(None, input.provider, input.model, hub_err)
@@ -78,7 +89,82 @@ class Hub:
     ) -> GenerateOutput:
         adapter = self._require_adapter(input.provider, entitlement)
         try:
-            return adapter.generate(input)
+            output = adapter.generate(input)
+            return _attach_cost(input, output)
+        except Exception as err:
+            hub_err = to_hub_error(err)
+            self._registry.learn_model_unavailable(entitlement, input.provider, input.model, hub_err)
+            raise hub_err
+
+    def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
+        entitlement = self._entitlement_for_provider(input.provider)
+        if entitlement:
+            return self.generate_image_with_context(entitlement, input)
+        adapter = self._require_adapter(input.provider)
+        if not hasattr(adapter, "generate_image"):
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message=f"Provider {input.provider} does not support image generation",
+                )
+            )
+        try:
+            return adapter.generate_image(input)
+        except Exception as err:
+            hub_err = to_hub_error(err)
+            self._registry.learn_model_unavailable(None, input.provider, input.model, hub_err)
+            raise hub_err
+
+    def generate_image_with_context(
+        self, entitlement: EntitlementContext | None, input: ImageGenerateInput
+    ) -> ImageGenerateOutput:
+        adapter = self._require_adapter(input.provider, entitlement)
+        if not hasattr(adapter, "generate_image"):
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message=f"Provider {input.provider} does not support image generation",
+                )
+            )
+        try:
+            return adapter.generate_image(input)
+        except Exception as err:
+            hub_err = to_hub_error(err)
+            self._registry.learn_model_unavailable(entitlement, input.provider, input.model, hub_err)
+            raise hub_err
+
+    def generate_mesh(self, input: MeshGenerateInput) -> MeshGenerateOutput:
+        entitlement = self._entitlement_for_provider(input.provider)
+        if entitlement:
+            return self.generate_mesh_with_context(entitlement, input)
+        adapter = self._require_adapter(input.provider)
+        if not hasattr(adapter, "generate_mesh"):
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message=f"Provider {input.provider} does not support mesh generation",
+                )
+            )
+        try:
+            return adapter.generate_mesh(input)
+        except Exception as err:
+            hub_err = to_hub_error(err)
+            self._registry.learn_model_unavailable(None, input.provider, input.model, hub_err)
+            raise hub_err
+
+    def generate_mesh_with_context(
+        self, entitlement: EntitlementContext | None, input: MeshGenerateInput
+    ) -> MeshGenerateOutput:
+        adapter = self._require_adapter(input.provider, entitlement)
+        if not hasattr(adapter, "generate_mesh"):
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message=f"Provider {input.provider} does not support mesh generation",
+                )
+            )
+        try:
+            return adapter.generate_mesh(input)
         except Exception as err:
             hub_err = to_hub_error(err)
             self._registry.learn_model_unavailable(entitlement, input.provider, input.model, hub_err)
@@ -89,13 +175,13 @@ class Hub:
         if entitlement:
             return self.stream_generate_with_context(entitlement, input)
         adapter = self._require_adapter(input.provider)
-        return adapter.stream_generate(input)
+        return _attach_cost_stream(adapter.stream_generate(input), input.provider, input.model)
 
     def stream_generate_with_context(
         self, entitlement: EntitlementContext | None, input: GenerateInput
     ):
         adapter = self._require_adapter(input.provider, entitlement)
-        return adapter.stream_generate(input)
+        return _attach_cost_stream(adapter.stream_generate(input), input.provider, input.model)
 
     def _build_adapters(self, providers: Dict[Provider, object]):
         adapters = {}
@@ -127,7 +213,7 @@ class Hub:
 
     def _collect_keys(self, cfg: object) -> list[str]:
         api_key = getattr(cfg, "api_key", "") or ""
-        api_keys = getattr(cfg, \"api_keys\", None) or []
+        api_keys = getattr(cfg, "api_keys", None) or []
         keys = []
         seen = set()
         for raw in [api_key, *api_keys]:
@@ -211,3 +297,20 @@ class Hub:
                 )
             )
         return adapter
+
+
+def _attach_cost(input: GenerateInput, output: GenerateOutput) -> GenerateOutput:
+    cost = estimate_cost(input.provider, input.model, output.usage)
+    if cost is None:
+        return output
+    return replace(output, cost=cost)
+
+
+def _attach_cost_stream(stream, provider: Provider, model: str):
+    for chunk in stream:
+        if getattr(chunk, "type", None) == "message_end":
+            cost = estimate_cost(provider, model, getattr(chunk, "usage", None))
+            if cost is not None:
+                yield replace(chunk, cost=cost)
+                continue
+        yield chunk

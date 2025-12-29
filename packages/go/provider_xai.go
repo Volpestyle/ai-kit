@@ -43,6 +43,22 @@ func (x *xaiAdapter) Generate(ctx context.Context, in GenerateInput) (GenerateOu
 	return adapter.Generate(ctx, in)
 }
 
+func (x *xaiAdapter) GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error) {
+	return ImageGenerateOutput{}, &HubError{
+		Kind:     ErrorUnsupported,
+		Message:  "xAI image generation is not supported",
+		Provider: ProviderXAI,
+	}
+}
+
+func (x *xaiAdapter) GenerateMesh(ctx context.Context, in MeshGenerateInput) (MeshGenerateOutput, error) {
+	return MeshGenerateOutput{}, &HubError{
+		Kind:     ErrorUnsupported,
+		Message:  "xAI mesh generation is not supported",
+		Provider: ProviderXAI,
+	}
+}
+
 func (x *xaiAdapter) Stream(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error) {
 	adapter := x.selectAdapter(in)
 	return adapter.Stream(ctx, in)

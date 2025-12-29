@@ -13,6 +13,8 @@ import (
 type mockHub struct {
 	modelsResp   []ModelMetadata
 	generateResp GenerateOutput
+	imageResp    ImageGenerateOutput
+	meshResp     MeshGenerateOutput
 	streamChunks []StreamChunk
 	lastListOpts *ListModelsOptions
 }
@@ -24,6 +26,14 @@ func (m *mockHub) ListModels(ctx context.Context, opts *ListModelsOptions) ([]Mo
 
 func (m *mockHub) Generate(ctx context.Context, in GenerateInput) (GenerateOutput, error) {
 	return m.generateResp, nil
+}
+
+func (m *mockHub) GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error) {
+	return m.imageResp, nil
+}
+
+func (m *mockHub) GenerateMesh(ctx context.Context, in MeshGenerateInput) (MeshGenerateOutput, error) {
+	return m.meshResp, nil
 }
 
 func (m *mockHub) StreamGenerate(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error) {

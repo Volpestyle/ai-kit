@@ -116,6 +116,17 @@ type ImageContent struct {
 	MediaType string `json:"mediaType,omitempty"`
 }
 
+type ImageInput struct {
+	URL       string `json:"url,omitempty"`
+	Base64    string `json:"base64,omitempty"`
+	MediaType string `json:"mediaType,omitempty"`
+}
+
+type ImageOutput struct {
+	Mime string `json:"mime"`
+	Data string `json:"data"`
+}
+
 type Message struct {
 	Role       string        `json:"role"`
 	Content    []ContentPart `json:"content"`
@@ -159,6 +170,35 @@ type GenerateInput struct {
 	Metadata       map[string]string `json:"metadata,omitempty"`
 }
 
+type ImageGenerateInput struct {
+	Provider    Provider    `json:"provider"`
+	Model       string      `json:"model"`
+	Prompt      string      `json:"prompt"`
+	Size        string      `json:"size,omitempty"`
+	InputImages []ImageInput `json:"inputImages,omitempty"`
+}
+
+type ImageGenerateOutput struct {
+	Mime   string        `json:"mime"`
+	Data   string        `json:"data"`
+	Images []ImageOutput `json:"images,omitempty"`
+	Raw    interface{}   `json:"raw,omitempty"`
+}
+
+type MeshGenerateInput struct {
+	Provider    Provider    `json:"provider"`
+	Model       string      `json:"model"`
+	Prompt      string      `json:"prompt"`
+	InputImages []ImageInput `json:"inputImages,omitempty"`
+	Format      string      `json:"format,omitempty"`
+}
+
+type MeshGenerateOutput struct {
+	Data   string      `json:"data"`
+	Format string      `json:"format,omitempty"`
+	Raw    interface{} `json:"raw,omitempty"`
+}
+
 type ToolCall struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
@@ -171,11 +211,19 @@ type Usage struct {
 	TotalTokens  int `json:"totalTokens,omitempty"`
 }
 
+type CostBreakdown struct {
+	InputCostUSD     float64      `json:"input_cost_usd,omitempty"`
+	OutputCostUSD    float64      `json:"output_cost_usd,omitempty"`
+	TotalCostUSD     float64      `json:"total_cost_usd,omitempty"`
+	PricingPerMillion *TokenPrices `json:"pricing_per_million,omitempty"`
+}
+
 type GenerateOutput struct {
 	Text         string      `json:"text,omitempty"`
 	ToolCalls    []ToolCall  `json:"toolCalls,omitempty"`
 	Usage        *Usage      `json:"usage,omitempty"`
 	FinishReason string      `json:"finishReason,omitempty"`
+	Cost         *CostBreakdown `json:"cost,omitempty"`
 	Raw          interface{} `json:"raw,omitempty"`
 }
 
@@ -202,6 +250,7 @@ type StreamChunk struct {
 	Delta        string          `json:"delta,omitempty"`
 	Usage        *Usage          `json:"usage,omitempty"`
 	FinishReason string          `json:"finishReason,omitempty"`
+	Cost         *CostBreakdown `json:"cost,omitempty"`
 	Error        *ChunkError     `json:"error,omitempty"`
 }
 

@@ -11,13 +11,18 @@ import {
   GenerateOutput,
   Hub,
   HubConfig,
+  ImageGenerateInput,
+  ImageGenerateOutput,
   ListModelsParams,
+  MeshGenerateInput,
+  MeshGenerateOutput,
   ModelRecord,
   Provider,
   StreamChunk,
 } from "./types.js";
 import { ErrorKind } from "./types.js";
 import { LLMHubError, toHubError } from "./errors.js";
+import { estimateCost } from "./pricing.js";
 
 class KeyPool {
   private index = 0;
@@ -76,7 +81,8 @@ class DefaultHub implements Hub {
     }
     const adapter = this.requireAdapter(input.provider);
     try {
-      return await adapter.generate({ ...input, stream: false });
+      const output = await adapter.generate({ ...input, stream: false });
+      return attachCost(input, output);
     } catch (err) {
       const hubErr = toHubError(err);
       this.registry.learnModelUnavailable(undefined, input.provider, input.model, hubErr);
@@ -90,10 +96,59 @@ class DefaultHub implements Hub {
   ): Promise<GenerateOutput> {
     const adapter = this.requireAdapter(input.provider, entitlement);
     try {
-      return await adapter.generate({ ...input, stream: false });
+      const output = await adapter.generate({ ...input, stream: false });
+      return attachCost(input, output);
     } catch (err) {
       const hubErr = toHubError(err);
       this.registry.learnModelUnavailable(entitlement, input.provider, input.model, hubErr);
+      throw hubErr;
+    }
+  }
+
+  async generateImage(
+    input: ImageGenerateInput,
+  ): Promise<ImageGenerateOutput> {
+    const entitlement = this.entitlementForProvider(input.provider);
+    if (entitlement) {
+      return this.generateImageWithContext(entitlement, input);
+    }
+    const adapter = this.requireAdapter(input.provider);
+    if (!adapter.generateImage) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unsupported,
+        message: `Provider ${input.provider} does not support image generation`,
+        provider: input.provider,
+      });
+    }
+    try {
+      return await adapter.generateImage(input);
+    } catch (err) {
+      const hubErr = toHubError(err);
+      this.registry.learnModelUnavailable(undefined, input.provider, input.model, hubErr);
+      throw hubErr;
+    }
+  }
+
+  async generateMesh(
+    input: MeshGenerateInput,
+  ): Promise<MeshGenerateOutput> {
+    const entitlement = this.entitlementForProvider(input.provider);
+    if (entitlement) {
+      return this.generateMeshWithContext(entitlement, input);
+    }
+    const adapter = this.requireAdapter(input.provider);
+    if (!adapter.generateMesh) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unsupported,
+        message: `Provider ${input.provider} does not support mesh generation`,
+        provider: input.provider,
+      });
+    }
+    try {
+      return await adapter.generateMesh(input);
+    } catch (err) {
+      const hubErr = toHubError(err);
+      this.registry.learnModelUnavailable(undefined, input.provider, input.model, hubErr);
       throw hubErr;
     }
   }
@@ -105,7 +160,7 @@ class DefaultHub implements Hub {
     }
     const adapter = this.requireAdapter(input.provider);
     const merged: GenerateInput = { ...input, stream: true };
-    return adapter.streamGenerate(merged);
+    return attachCostToStream(adapter.streamGenerate(merged), input.provider, input.model);
   }
 
   streamGenerateWithContext(
@@ -114,7 +169,49 @@ class DefaultHub implements Hub {
   ): AsyncIterable<StreamChunk> {
     const adapter = this.requireAdapter(input.provider, entitlement);
     const merged: GenerateInput = { ...input, stream: true };
-    return adapter.streamGenerate(merged);
+    return attachCostToStream(adapter.streamGenerate(merged), input.provider, input.model);
+  }
+
+  private async generateImageWithContext(
+    entitlement: EntitlementContext | undefined,
+    input: ImageGenerateInput,
+  ): Promise<ImageGenerateOutput> {
+    const adapter = this.requireAdapter(input.provider, entitlement);
+    if (!adapter.generateImage) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unsupported,
+        message: `Provider ${input.provider} does not support image generation`,
+        provider: input.provider,
+      });
+    }
+    try {
+      return await adapter.generateImage(input);
+    } catch (err) {
+      const hubErr = toHubError(err);
+      this.registry.learnModelUnavailable(entitlement, input.provider, input.model, hubErr);
+      throw hubErr;
+    }
+  }
+
+  private async generateMeshWithContext(
+    entitlement: EntitlementContext | undefined,
+    input: MeshGenerateInput,
+  ): Promise<MeshGenerateOutput> {
+    const adapter = this.requireAdapter(input.provider, entitlement);
+    if (!adapter.generateMesh) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unsupported,
+        message: `Provider ${input.provider} does not support mesh generation`,
+        provider: input.provider,
+      });
+    }
+    try {
+      return await adapter.generateMesh(input);
+    } catch (err) {
+      const hubErr = toHubError(err);
+      this.registry.learnModelUnavailable(entitlement, input.provider, input.model, hubErr);
+      throw hubErr;
+    }
   }
 
   private requireAdapter(
@@ -147,6 +244,31 @@ class DefaultHub implements Hub {
       apiKey,
       apiKeyFingerprint: fingerprintApiKey(apiKey),
     };
+  }
+}
+
+function attachCost(input: GenerateInput, output: GenerateOutput): GenerateOutput {
+  const cost = estimateCost(input.provider, input.model, output.usage);
+  if (!cost) {
+    return output;
+  }
+  return { ...output, cost };
+}
+
+async function* attachCostToStream(
+  stream: AsyncIterable<StreamChunk>,
+  provider: Provider,
+  model: string,
+): AsyncIterable<StreamChunk> {
+  for await (const chunk of stream) {
+    if (chunk.type === "message_end") {
+      const cost = estimateCost(provider, model, chunk.usage);
+      if (cost) {
+        yield { ...chunk, cost };
+        continue;
+      }
+    }
+    yield chunk;
   }
 }
 

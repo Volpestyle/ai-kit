@@ -134,6 +134,13 @@ class ContentPart:
 
 
 @dataclass
+class ImageInput:
+    url: Optional[str] = None
+    base64: Optional[str] = None
+    mediaType: Optional[str] = None
+
+
+@dataclass
 class Message:
     role: str
     content: List[ContentPart]
@@ -183,6 +190,39 @@ class GenerateInput:
 
 
 @dataclass
+class ImageGenerateInput:
+    provider: Provider
+    model: str
+    prompt: str
+    size: Optional[str] = None
+    inputImages: Optional[List[ImageInput]] = None
+
+
+@dataclass
+class ImageGenerateOutput:
+    mime: str
+    data: str
+    images: Optional[List[Dict[str, str]]] = None
+    raw: Optional[Any] = None
+
+
+@dataclass
+class MeshGenerateInput:
+    provider: Provider
+    model: str
+    prompt: str
+    inputImages: Optional[List[ImageInput]] = None
+    format: Optional[str] = None
+
+
+@dataclass
+class MeshGenerateOutput:
+    data: str
+    format: Optional[str] = None
+    raw: Optional[Any] = None
+
+
+@dataclass
 class ToolCall:
     id: str
     name: str
@@ -197,11 +237,20 @@ class Usage:
 
 
 @dataclass
+class CostBreakdown:
+    input_cost_usd: Optional[float] = None
+    output_cost_usd: Optional[float] = None
+    total_cost_usd: Optional[float] = None
+    pricing_per_million: Optional[TokenPrices] = None
+
+
+@dataclass
 class GenerateOutput:
     text: Optional[str] = None
     toolCalls: Optional[List[ToolCall]] = None
     usage: Optional[Usage] = None
     finishReason: Optional[str] = None
+    cost: Optional[CostBreakdown] = None
     raw: Optional[Any] = None
 
 
@@ -213,6 +262,7 @@ class StreamChunk:
     delta: Optional[str] = None
     usage: Optional[Usage] = None
     finishReason: Optional[str] = None
+    cost: Optional[CostBreakdown] = None
     error: Optional[Dict[str, Any]] = None
 
 

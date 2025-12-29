@@ -1,12 +1,18 @@
 import { Hub } from "../core/types.js";
-import { GenerateInput, ListModelsParams, Provider } from "../core/types.js";
+import {
+  GenerateInput,
+  ImageGenerateInput,
+  ListModelsParams,
+  MeshGenerateInput,
+  Provider,
+} from "../core/types.js";
 import { toHubError, LLMHubError } from "../core/errors.js";
 import { ErrorKind } from "../core/types.js";
 
 export interface RequestLike {
   method?: string;
   query?: Record<string, string | string[] | undefined>;
-  body?: GenerateInput | string | null;
+  body?: GenerateInput | ImageGenerateInput | MeshGenerateInput | string | null;
   headers?: Record<string, string>;
   get?(name: string): string | undefined;
 }
@@ -46,6 +52,26 @@ export function httpHandlers(hub: Hub) {
         try {
           const input = normalizeGenerateInput(req.body ?? null);
           const output = await hub.generate({ ...input, stream: false });
+          res.status(200).json(output);
+        } catch (err) {
+          sendJsonError(res, err);
+        }
+      },
+    image:
+      () => async (req: RequestLike, res: ResponseLike) => {
+        try {
+          const input = normalizeImageInput(req.body ?? null);
+          const output = await hub.generateImage(input);
+          res.status(200).json(output);
+        } catch (err) {
+          sendJsonError(res, err);
+        }
+      },
+    mesh:
+      () => async (req: RequestLike, res: ResponseLike) => {
+        try {
+          const input = normalizeMeshInput(req.body ?? null);
+          const output = await hub.generateMesh(input);
           res.status(200).json(output);
         } catch (err) {
           sendJsonError(res, err);
@@ -184,6 +210,94 @@ function normalizeGenerateInput(payload: unknown): GenerateInput {
   return input as unknown as GenerateInput;
 }
 
+function normalizeImageInput(payload: unknown): ImageGenerateInput {
+  let parsed: ImageGenerateInput | string | null | Record<string, unknown> = payload as
+    | ImageGenerateInput
+    | string
+    | null
+    | Record<string, unknown>;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw new LLMHubError({
+        kind: ErrorKind.Validation,
+        message: "Body must be valid JSON",
+      });
+    }
+  }
+  if (!parsed || typeof parsed !== "object") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "Request body must be an ImageGenerateInput object",
+    });
+  }
+  const input = parsed as Record<string, unknown>;
+  if (typeof input.provider !== "string") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "provider is required and must be a string",
+    });
+  }
+  if (typeof input.model !== "string") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "model is required and must be a string",
+    });
+  }
+  if (typeof input.prompt !== "string") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "prompt is required and must be a string",
+    });
+  }
+  return input as unknown as ImageGenerateInput;
+}
+
+function normalizeMeshInput(payload: unknown): MeshGenerateInput {
+  let parsed: MeshGenerateInput | string | null | Record<string, unknown> = payload as
+    | MeshGenerateInput
+    | string
+    | null
+    | Record<string, unknown>;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw new LLMHubError({
+        kind: ErrorKind.Validation,
+        message: "Body must be valid JSON",
+      });
+    }
+  }
+  if (!parsed || typeof parsed !== "object") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "Request body must be a MeshGenerateInput object",
+    });
+  }
+  const input = parsed as Record<string, unknown>;
+  if (typeof input.provider !== "string") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "provider is required and must be a string",
+    });
+  }
+  if (typeof input.model !== "string") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "model is required and must be a string",
+    });
+  }
+  if (typeof input.prompt !== "string") {
+    throw new LLMHubError({
+      kind: ErrorKind.Validation,
+      message: "prompt is required and must be a string",
+    });
+  }
+  return input as unknown as MeshGenerateInput;
+}
+
 function parseQueryPayload(req: RequestLike): unknown {
   const raw = req.query?.payload;
   if (!raw) {
@@ -235,6 +349,8 @@ function sendSSEError(res: ResponseLike, err: unknown) {
 function mapStatus(err: LLMHubError): number {
   switch (err.kind) {
     case ErrorKind.Validation:
+      return 400;
+    case ErrorKind.Unsupported:
       return 400;
     case ErrorKind.ProviderAuth:
       return 401;

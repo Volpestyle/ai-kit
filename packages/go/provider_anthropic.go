@@ -118,6 +118,22 @@ func (a *anthropicAdapter) Generate(ctx context.Context, in GenerateInput) (Gene
 	return convertAnthropicResponse(resp), nil
 }
 
+func (a *anthropicAdapter) GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error) {
+	return ImageGenerateOutput{}, &HubError{
+		Kind:     ErrorUnsupported,
+		Message:  "Anthropic image generation is not supported",
+		Provider: a.provider,
+	}
+}
+
+func (a *anthropicAdapter) GenerateMesh(ctx context.Context, in MeshGenerateInput) (MeshGenerateOutput, error) {
+	return MeshGenerateOutput{}, &HubError{
+		Kind:     ErrorUnsupported,
+		Message:  "Anthropic mesh generation is not supported",
+		Provider: a.provider,
+	}
+}
+
 func (a *anthropicAdapter) Stream(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error) {
 	payload := a.buildPayload(in, true)
 	usesStructuredOutput := in.ResponseFormat != nil && in.ResponseFormat.Type == "json_schema"

@@ -37,6 +37,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenerateOutput'
+  /image:
+    post:
+      summary: Run a single image generation request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageGenerateInput'
+      responses:
+        '200':
+          description: Image generation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageGenerateOutput'
+  /mesh:
+    post:
+      summary: Run a single mesh generation request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeshGenerateInput'
+      responses:
+        '200':
+          description: Mesh generation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeshGenerateOutput'
   /generate/stream:
     post:
       summary: Streaming generation via Server-Sent Events
@@ -121,6 +153,12 @@ components:
         name: { type: string }
         description: { type: string }
         parameters: { type: object }
+    ImageInput:
+      type: object
+      properties:
+        url: { type: string }
+        base64: { type: string }
+        mediaType: { type: string }
     GenerateInput:
       type: object
       required: [provider, model, messages]
@@ -149,6 +187,50 @@ components:
           type: object
           additionalProperties:
             type: string
+    ImageGenerateInput:
+      type: object
+      required: [provider, model, prompt]
+      properties:
+        provider: { type: string }
+        model: { type: string }
+        prompt: { type: string }
+        size: { type: string }
+        inputImages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageInput'
+    ImageGenerateOutput:
+      type: object
+      required: [mime, data]
+      properties:
+        mime: { type: string }
+        data: { type: string }
+        images:
+          type: array
+          items:
+            type: object
+            required: [mime, data]
+            properties:
+              mime: { type: string }
+              data: { type: string }
+    MeshGenerateInput:
+      type: object
+      required: [provider, model, prompt]
+      properties:
+        provider: { type: string }
+        model: { type: string }
+        prompt: { type: string }
+        format: { type: string }
+        inputImages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageInput'
+    MeshGenerateOutput:
+      type: object
+      required: [data]
+      properties:
+        data: { type: string }
+        format: { type: string }
     ToolCall:
       type: object
       properties:

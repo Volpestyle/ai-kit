@@ -11,6 +11,8 @@ import (
 type HubAPI interface {
 	ListModels(ctx context.Context, opts *ListModelsOptions) ([]ModelMetadata, error)
 	Generate(ctx context.Context, in GenerateInput) (GenerateOutput, error)
+	GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error)
+	GenerateMesh(ctx context.Context, in MeshGenerateInput) (MeshGenerateOutput, error)
 	StreamGenerate(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error)
 }
 
@@ -48,6 +50,38 @@ func GenerateHandler(h HubAPI) http.HandlerFunc {
 			return
 		}
 		output, err := h.Generate(r.Context(), input)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, output)
+	}
+}
+
+func ImageHandler(h HubAPI) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input ImageGenerateInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		output, err := h.GenerateImage(r.Context(), input)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, output)
+	}
+}
+
+func MeshHandler(h HubAPI) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input MeshGenerateInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		output, err := h.GenerateMesh(r.Context(), input)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -147,6 +181,8 @@ func writeError(w http.ResponseWriter, err error) {
 		resp.Error.Message = hubErr.Message
 		switch hubErr.Kind {
 		case ErrorValidation:
+			status = http.StatusBadRequest
+		case ErrorUnsupported:
 			status = http.StatusBadRequest
 		case ErrorProviderAuth:
 			status = http.StatusUnauthorized

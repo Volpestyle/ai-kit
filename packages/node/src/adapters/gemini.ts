@@ -4,6 +4,8 @@ import {
   GenerateInput,
   GenerateOutput,
   GoogleProviderConfig,
+  ImageGenerateInput,
+  ImageGenerateOutput,
   ModelMetadata,
   Provider,
   ResponseFormat,
@@ -114,6 +116,32 @@ export class GoogleAdapter implements ProviderAdapter {
       },
     );
     return this.normalizeResponse(response);
+  }
+
+  async generateImage(
+    input: ImageGenerateInput,
+  ): Promise<ImageGenerateOutput> {
+    const payload = buildImagePayload(input);
+    const response = await this.fetchJSON<GeminiGenerateResponse>(
+      this.buildModelPath(input.model, ":generateContent"),
+      {
+        method: "POST",
+        body: payload,
+      },
+    );
+    const image = extractInlineImage(response);
+    if (!image) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unknown,
+        message: "Gemini image response missing inline data",
+        provider: this.provider,
+      });
+    }
+    return {
+      mime: image.mimeType ?? "image/png",
+      data: image.data,
+      raw: response,
+    };
   }
 
   streamGenerate(input: GenerateInput): AsyncIterable<StreamChunk> {
@@ -330,6 +358,41 @@ function buildGeminiContents(messages: GenerateInput["messages"]) {
       : undefined,
     contents,
   };
+}
+
+function buildImagePayload(input: ImageGenerateInput) {
+  const parts: GeminiPart[] = [{ text: input.prompt }];
+  for (const image of input.inputImages ?? []) {
+    if (image.base64) {
+      parts.push({
+        inlineData: {
+          mimeType: image.mediaType ?? "image/png",
+          data: image.base64,
+        },
+      });
+    } else if (image.url) {
+      parts.push({
+        fileData: {
+          mimeType: image.mediaType,
+          fileUri: image.url,
+        },
+      });
+    }
+  }
+  return {
+    contents: [{ role: "user", parts }],
+  };
+}
+
+function extractInlineImage(response: GeminiGenerateResponse) {
+  for (const candidate of response.candidates ?? []) {
+    for (const part of candidate.content?.parts ?? []) {
+      if ("inlineData" in part && part.inlineData?.data) {
+        return part.inlineData;
+      }
+    }
+  }
+  return null;
 }
 
 function buildGenerationConfig(

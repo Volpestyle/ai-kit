@@ -1,6 +1,6 @@
 # llmhub
 
-Cross-provider LLM hub with reusable libraries for Node.js (TypeScript), Go, and Python. The hub keeps a normalized model registry, adapts request/response shapes across OpenAI, Anthropic, xAI (Grok), and Google Gemini, and exposes HTTP helpers for `/provider-models`, `/generate`, and `/generate/stream` endpoints.
+Cross-provider LLM hub with reusable libraries for Node.js (TypeScript), Go, and Python. The hub keeps a normalized model registry, adapts request/response shapes across OpenAI, Anthropic, xAI (Grok), and Google Gemini, and exposes HTTP helpers for `/provider-models`, `/generate`, `/generate/stream`, `/image`, and `/mesh` endpoints.
 
 ## Repository layout
 
@@ -31,6 +31,8 @@ app.use(express.json());
 const handlers = httpHandlers(hub);
 app.get("/provider-models", handlers.models());
 app.post("/generate", handlers.generate());
+app.post("/image", handlers.image());
+app.post("/mesh", handlers.mesh());
 app.post("/generate/stream", handlers.generateSSE());
 ```
 
@@ -54,6 +56,8 @@ if err != nil { log.Fatal(err) }
 
 http.HandleFunc("/provider-models", llmhub.ModelsHandler(hub, nil))
 http.HandleFunc("/generate", llmhub.GenerateHandler(hub))
+http.HandleFunc("/image", llmhub.ImageHandler(hub))
+http.HandleFunc("/mesh", llmhub.MeshHandler(hub))
 http.HandleFunc("/generate/stream", llmhub.GenerateSSEHandler(hub))
 ```
 
@@ -120,8 +124,9 @@ models = hub.list_models()
 
 ## Refreshing curated models
 
-- Set the provider API keys you want to pull live metadata from (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `GOOGLE_API_KEY`) — either export them or drop them in `packages/node/.env`/`.env.local` (the refresh script loads both via `dotenv`).
-- From `packages/node`, run `npm run refresh:models` to call each configured provider (once, with `refresh: true`) and rewrite `models/curated_models.json`, the capability/pricing overlay both runtimes load at startup.
+- Set `OPENAI_API_KEY` (either export it or drop it in `packages/node/.env`/`.env.local`) so the pricing parser can run.
+- From `packages/node`, run `npm run refresh:models` to render provider pricing pages, parse them with an LLM, and rewrite `models/curated_models.json`. The script only updates fields that are explicitly present in the scraped pages (no heuristics).
+- The refresh script uses Playwright for rendering and the OpenAI Responses API for parsing; set `OPENAI_API_KEY` and optionally `PRICING_PARSER_MODEL`. Override pricing URLs with `OPENAI_PRICING_URL`, `ANTHROPIC_PRICING_URL`, `XAI_PRICING_URL`, `GOOGLE_PRICING_URL` if needed.
 - At runtime the model registry always pulls from provider APIs (cached by default). The curated JSON is used as an overlay to enrich display names, capabilities, context windows, and pricing metadata.
 - Append `?refresh=true` (or call `hub.listModels({ refresh: true })`) to bypass the registry cache when you explicitly need a live refresh.
 - See `docs/design_doc.md` and `docs/implementation_guide.md` for more detail on how the curated overlay and refresh script fit into the registry strategy.

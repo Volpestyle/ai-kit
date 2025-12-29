@@ -94,6 +94,40 @@ func (g *googleAdapter) Generate(ctx context.Context, in GenerateInput) (Generat
 	return convertGeminiResponse(resp), nil
 }
 
+func (g *googleAdapter) GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error) {
+	path := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", g.baseURL, ensureModelsPrefix(in.Model), g.config.APIKey)
+	payload := buildGeminiImagePayload(in)
+	req, err := jsonRequestWithContext(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return ImageGenerateOutput{}, err
+	}
+	var resp geminiResponse
+	if err := doJSON(ctx, g.client, req, ProviderGoogle, &resp); err != nil {
+		return ImageGenerateOutput{}, err
+	}
+	mime, data := extractGeminiInlineImage(resp)
+	if data == "" {
+		return ImageGenerateOutput{}, &HubError{
+			Kind:     ErrorUnknown,
+			Message:  "Gemini image response missing inline data",
+			Provider: ProviderGoogle,
+		}
+	}
+	return ImageGenerateOutput{
+		Mime: mime,
+		Data: data,
+		Raw:  resp,
+	}, nil
+}
+
+func (g *googleAdapter) GenerateMesh(ctx context.Context, in MeshGenerateInput) (MeshGenerateOutput, error) {
+	return MeshGenerateOutput{}, &HubError{
+		Kind:     ErrorUnsupported,
+		Message:  "Gemini mesh generation is not supported",
+		Provider: ProviderGoogle,
+	}
+}
+
 func (g *googleAdapter) Stream(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error) {
 	path := fmt.Sprintf("%s/v1beta/models/%s:streamGenerateContent?alt=sse&key=%s", g.baseURL, ensureModelsPrefix(in.Model), g.config.APIKey)
 	payload := g.buildPayload(in)
@@ -159,6 +193,40 @@ func (g *googleAdapter) buildPayload(in GenerateInput) map[string]interface{} {
 		"toolConfig":        buildGeminiToolConfig(in.ToolChoice),
 	}
 	return payload
+}
+
+func buildGeminiImagePayload(in ImageGenerateInput) map[string]interface{} {
+	parts := []map[string]interface{}{
+		{"text": in.Prompt},
+	}
+	for _, image := range in.InputImages {
+		if image.Base64 != "" {
+			mimeType := image.MediaType
+			if strings.TrimSpace(mimeType) == "" {
+				mimeType = "image/png"
+			}
+			parts = append(parts, map[string]interface{}{
+				"inlineData": map[string]string{
+					"mimeType": mimeType,
+					"data":     image.Base64,
+				},
+			})
+		} else if image.URL != "" {
+			parts = append(parts, map[string]interface{}{
+				"fileData": map[string]string{
+					"fileUri": image.URL,
+				},
+			})
+		}
+	}
+	return map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"role":  "user",
+				"parts": parts,
+			},
+		},
+	}
 }
 
 func buildGeminiMessages(messages []Message) (map[string]interface{}, []map[string]interface{}) {
@@ -298,6 +366,24 @@ func convertGeminiResponse(resp geminiResponse) GenerateOutput {
 		FinishReason: finish,
 		Raw:          resp,
 	}
+}
+
+func extractGeminiInlineImage(resp geminiResponse) (string, string) {
+	for _, candidate := range resp.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if inline, ok := part["inlineData"].(map[string]interface{}); ok {
+				data, _ := inline["data"].(string)
+				mime, _ := inline["mimeType"].(string)
+				if data != "" {
+					if mime == "" {
+						mime = "image/png"
+					}
+					return mime, data
+				}
+			}
+		}
+	}
+	return "", ""
 }
 
 func ensureModelsPrefix(id string) string {

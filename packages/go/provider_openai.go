@@ -118,6 +118,13 @@ type openAIResponsesStreamPayload struct {
 	} `json:"error"`
 }
 
+type openAIImageResponse struct {
+	Data []struct {
+		B64JSON string `json:"b64_json"`
+		URL     string `json:"url"`
+	} `json:"data"`
+}
+
 func (p *openAIResponsesStreamPayload) ErrorCode() string {
 	if p == nil || p.Error == nil {
 		return ""
@@ -196,6 +203,55 @@ func (a *openAIAdapter) Generate(ctx context.Context, in GenerateInput) (Generat
 		return GenerateOutput{}, err
 	}
 	return convertOpenAIChatResponse(payload), nil
+}
+
+func (a *openAIAdapter) GenerateImage(ctx context.Context, in ImageGenerateInput) (ImageGenerateOutput, error) {
+	if len(in.InputImages) > 0 {
+		return ImageGenerateOutput{}, &HubError{
+			Kind:     ErrorUnsupported,
+			Message:  "OpenAI image edits are not supported in this adapter",
+			Provider: a.provider,
+		}
+	}
+	size := in.Size
+	if strings.TrimSpace(size) == "" {
+		size = "1024x1024"
+	}
+	body := map[string]interface{}{
+		"model":           in.Model,
+		"prompt":          in.Prompt,
+		"size":            size,
+		"response_format": "b64_json",
+		"n":               1,
+	}
+	req, err := a.jsonRequest(ctx, http.MethodPost, "/v1/images", body)
+	if err != nil {
+		return ImageGenerateOutput{}, err
+	}
+	var payload openAIImageResponse
+	if err := doJSON(ctx, a.client, req, a.provider, &payload); err != nil {
+		return ImageGenerateOutput{}, err
+	}
+	if len(payload.Data) == 0 || payload.Data[0].B64JSON == "" {
+		return ImageGenerateOutput{}, &HubError{
+			Kind:     ErrorUnknown,
+			Message:  "OpenAI image response missing base64 data",
+			Provider: a.provider,
+		}
+	}
+	return ImageGenerateOutput{
+		Mime: "image/png",
+		Data: payload.Data[0].B64JSON,
+		Raw:  payload,
+	}, nil
+}
+
+func (a *openAIAdapter) GenerateMesh(ctx context.Context, in MeshGenerateInput) (MeshGenerateOutput, error) {
+	return MeshGenerateOutput{}, &HubError{
+		Kind:     ErrorUnsupported,
+		Message:  "OpenAI mesh generation is not supported",
+		Provider: a.provider,
+	}
 }
 
 func (a *openAIAdapter) Stream(ctx context.Context, in GenerateInput) (<-chan StreamChunk, error) {

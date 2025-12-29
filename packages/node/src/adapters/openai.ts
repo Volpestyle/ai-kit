@@ -2,6 +2,8 @@ import { ProviderAdapter } from "../core/provider.js";
 import {
   GenerateInput,
   GenerateOutput,
+  ImageGenerateInput,
+  ImageGenerateOutput,
   ModelMetadata,
   OpenAIProviderConfig,
   Provider,
@@ -18,6 +20,13 @@ import { streamSSE, parseEventData } from "../core/stream.js";
 
 interface OpenAIModelList {
   data: Array<{ id: string }>;
+}
+
+interface OpenAIImageResponse {
+  data: Array<{
+    b64_json?: string;
+    url?: string;
+  }>;
 }
 
 interface ChatCompletion {
@@ -181,6 +190,41 @@ export class OpenAIAdapter implements ProviderAdapter {
       signal: input.signal,
     });
     return this.normalizeChatOutput(data);
+  }
+
+  async generateImage(
+    input: ImageGenerateInput,
+  ): Promise<ImageGenerateOutput> {
+    if (input.inputImages?.length) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unsupported,
+        message: "OpenAI image edits are not supported in this adapter",
+        provider: this.provider,
+      });
+    }
+    const response = await this.fetchJSON<OpenAIImageResponse>("/v1/images", {
+      method: "POST",
+      body: {
+        model: input.model,
+        prompt: input.prompt,
+        size: input.size ?? "1024x1024",
+        response_format: "b64_json",
+        n: 1,
+      },
+    });
+    const image = response.data?.[0];
+    if (!image?.b64_json) {
+      throw new LLMHubError({
+        kind: ErrorKind.Unknown,
+        message: "OpenAI image response missing base64 data",
+        provider: this.provider,
+      });
+    }
+    return {
+      mime: "image/png",
+      data: image.b64_json,
+      raw: response,
+    };
   }
 
   streamGenerate(input: GenerateInput): AsyncIterable<StreamChunk> {

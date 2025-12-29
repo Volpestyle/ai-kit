@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .openai import OpenAIAdapter, OpenAIConfig
+from ..errors import ErrorKind, HubErrorPayload, LLMHubError
+from ..types import ImageGenerateInput, ImageGenerateOutput
 from ..types import Provider
 
 
@@ -26,3 +28,21 @@ class XAIAdapter(OpenAIAdapter):
         )
         super().__init__(openai_config, provider=provider)
         self.compatibility_mode = config.compatibility_mode
+
+    def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
+        raise LLMHubError(
+            HubErrorPayload(
+                kind=ErrorKind.UNSUPPORTED,
+                message="xAI image generation is not supported",
+                provider=self.provider,
+            )
+        )
+
+    def generate_mesh(self, input: "MeshGenerateInput"):
+        raise LLMHubError(
+            HubErrorPayload(
+                kind=ErrorKind.UNSUPPORTED,
+                message="xAI mesh generation is not supported",
+                provider=self.provider,
+            )
+        )

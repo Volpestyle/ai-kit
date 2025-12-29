@@ -5,10 +5,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
 from ..http import request_json, request_stream
+from ..errors import ErrorKind, HubErrorPayload, LLMHubError
 from ..sse import iter_sse_events
 from ..types import (
     GenerateInput,
     GenerateOutput,
+    ImageGenerateInput,
+    ImageGenerateOutput,
     Message,
     ModelCapabilities,
     ModelMetadata,
@@ -70,6 +73,51 @@ class OpenAIAdapter:
         if self._should_use_responses(input):
             return self._generate_responses(input)
         return self._generate_chat(input)
+
+    def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
+        if input.inputImages:
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message="OpenAI image edits are not supported in this adapter",
+                    provider=self.provider,
+                )
+            )
+        url = f"{self.base_url}/v1/images"
+        payload = request_json(
+            "POST",
+            url,
+            self._headers(),
+            json_body={
+                "model": input.model,
+                "prompt": input.prompt,
+                "size": input.size or "1024x1024",
+                "response_format": "b64_json",
+                "n": 1,
+            },
+            timeout=self.config.timeout,
+        )
+        data = payload.get("data", []) or []
+        image = data[0] if data else {}
+        b64 = image.get("b64_json")
+        if not b64:
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNKNOWN,
+                    message="OpenAI image response missing base64 data",
+                    provider=self.provider,
+                )
+            )
+        return ImageGenerateOutput(mime="image/png", data=b64, raw=payload)
+
+    def generate_mesh(self, input: "MeshGenerateInput"):
+        raise LLMHubError(
+            HubErrorPayload(
+                kind=ErrorKind.UNSUPPORTED,
+                message="OpenAI mesh generation is not supported",
+                provider=self.provider,
+            )
+        )
 
     def stream_generate(self, input: GenerateInput) -> Iterable[StreamChunk]:
         if self._should_use_responses(input):
@@ -182,22 +230,25 @@ class OpenAIAdapter:
 
 
 def _build_responses_payload(input: GenerateInput, stream: bool) -> Dict[str, Any]:
-    return {
+    payload: Dict[str, Any] = {
         "model": input.model,
         "input": _map_messages_to_responses(input.messages),
         "tools": _map_tools(input.tools),
         "tool_choice": _map_tool_choice(input.toolChoice),
-        "response_format": _map_response_format(input.responseFormat),
         "temperature": input.temperature,
         "top_p": input.topP,
         "max_output_tokens": input.maxTokens,
         "metadata": input.metadata,
         "stream": stream,
     }
+    response_format = _map_response_format(input.responseFormat)
+    if response_format is not None:
+        payload["text"] = {"format": response_format}
+    return {k: v for k, v in payload.items() if v is not None}
 
 
 def _build_chat_payload(input: GenerateInput, stream: bool) -> Dict[str, Any]:
-    return {
+    payload: Dict[str, Any] = {
         "model": input.model,
         "messages": _map_messages_to_chat(input.messages),
         "temperature": input.temperature,
@@ -206,8 +257,11 @@ def _build_chat_payload(input: GenerateInput, stream: bool) -> Dict[str, Any]:
         "stream": stream,
         "tools": _map_tools(input.tools),
         "tool_choice": _map_tool_choice(input.toolChoice),
-        "response_format": _map_response_format(input.responseFormat),
     }
+    response_format = _map_response_format(input.responseFormat)
+    if response_format is not None:
+        payload["response_format"] = response_format
+    return {k: v for k, v in payload.items() if v is not None}
 
 
 def _map_messages_to_responses(messages: Iterable[Message | Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -339,6 +393,8 @@ def _normalize_responses_output(payload: Dict[str, Any]) -> GenerateOutput:
         for content in output.get("content", []) or []:
             if content.get("type") == "output_text" and content.get("text"):
                 text_parts.append(content.get("text"))
+            if content.get("type") == "refusal" and content.get("refusal"):
+                text_parts.append(content.get("refusal"))
             if content.get("type") == "tool_call":
                 tool_calls.append(
                     ToolCall(

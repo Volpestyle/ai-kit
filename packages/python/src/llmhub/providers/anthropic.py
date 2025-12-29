@@ -4,11 +4,14 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
+from ..errors import ErrorKind, HubErrorPayload, LLMHubError
 from ..http import request_json, request_stream
 from ..sse import iter_sse_events
 from ..types import (
     GenerateInput,
     GenerateOutput,
+    ImageGenerateInput,
+    ImageGenerateOutput,
     Message,
     ModelCapabilities,
     ModelMetadata,
@@ -75,6 +78,24 @@ class AnthropicAdapter:
             timeout=self.config.timeout,
         )
         return _normalize_output(payload)
+
+    def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
+        raise LLMHubError(
+            HubErrorPayload(
+                kind=ErrorKind.UNSUPPORTED,
+                message="Anthropic image generation is not supported",
+                provider=self.provider,
+            )
+        )
+
+    def generate_mesh(self, input: "MeshGenerateInput"):
+        raise LLMHubError(
+            HubErrorPayload(
+                kind=ErrorKind.UNSUPPORTED,
+                message="Anthropic mesh generation is not supported",
+                provider=self.provider,
+            )
+        )
 
     def stream_generate(self, input: GenerateInput) -> Iterable[StreamChunk]:
         url = f"{self.base_url}/v1/messages"

@@ -206,6 +206,13 @@ export interface Usage {
   totalTokens?: number;
 }
 
+export interface CostBreakdown {
+  input_cost_usd?: number;
+  output_cost_usd?: number;
+  total_cost_usd?: number;
+  pricing_per_million?: TokenPrices;
+}
+
 export interface GenerateInput {
   provider: Provider;
   model: string;
@@ -226,13 +233,49 @@ export interface GenerateOutput {
   toolCalls?: ToolCall[];
   usage?: Usage;
   finishReason?: string;
+  cost?: CostBreakdown;
+  raw?: unknown;
+}
+
+export interface ImageInput {
+  url?: string;
+  base64?: string;
+  mediaType?: string;
+}
+
+export interface ImageGenerateInput {
+  provider: Provider;
+  model: string;
+  prompt: string;
+  size?: string;
+  inputImages?: ImageInput[];
+}
+
+export interface ImageGenerateOutput {
+  mime: string;
+  data: string;
+  images?: Array<{ mime: string; data: string }>;
+  raw?: unknown;
+}
+
+export interface MeshGenerateInput {
+  provider: Provider;
+  model: string;
+  prompt: string;
+  inputImages?: ImageInput[];
+  format?: "glb";
+}
+
+export interface MeshGenerateOutput {
+  data: string;
+  format?: "glb";
   raw?: unknown;
 }
 
 export type StreamChunk =
   | { type: "delta"; textDelta: string }
   | { type: "tool_call"; call: ToolCall; delta?: string }
-  | { type: "message_end"; usage?: Usage; finishReason?: string }
+  | { type: "message_end"; usage?: Usage; finishReason?: string; cost?: CostBreakdown }
   | {
       type: "error";
       error: {
@@ -333,6 +376,8 @@ export interface Hub {
     entitlement: EntitlementContext | undefined,
     input: GenerateInput,
   ): Promise<GenerateOutput>;
+  generateImage(input: ImageGenerateInput): Promise<ImageGenerateOutput>;
+  generateMesh(input: MeshGenerateInput): Promise<MeshGenerateOutput>;
   streamGenerate(input: GenerateInput): AsyncIterable<StreamChunk>;
   streamGenerateWithContext(
     entitlement: EntitlementContext | undefined,

@@ -5,10 +5,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
 from ..http import request_json, request_stream
+from ..errors import ErrorKind, HubErrorPayload, LLMHubError
 from ..sse import iter_sse_events
 from ..types import (
     GenerateInput,
     GenerateOutput,
+    ImageGenerateInput,
+    ImageGenerateOutput,
     ModelCapabilities,
     ModelMetadata,
     Provider,
@@ -69,6 +72,36 @@ class GeminiAdapter:
         )
         return _normalize_output(payload)
 
+    def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
+        url = f"{self.base_url}/v1beta/models/{_ensure_models_prefix(input.model)}:generateContent?key={self.config.api_key}"
+        payload = request_json(
+            "POST",
+            url,
+            self._headers(),
+            json_body=_build_image_payload(input),
+            timeout=self.config.timeout,
+        )
+        inline = _extract_inline_image(payload)
+        if not inline or not inline.get("data"):
+            raise LLMHubError(
+                HubErrorPayload(
+                    kind=ErrorKind.UNKNOWN,
+                    message="Gemini image response missing inline data",
+                    provider=self.provider,
+                )
+            )
+        mime = inline.get("mimeType") or "image/png"
+        return ImageGenerateOutput(mime=mime, data=inline["data"], raw=payload)
+
+    def generate_mesh(self, input: "MeshGenerateInput"):
+        raise LLMHubError(
+            HubErrorPayload(
+                kind=ErrorKind.UNSUPPORTED,
+                message="Gemini mesh generation is not supported",
+                provider=self.provider,
+            )
+        )
+
     def stream_generate(self, input: GenerateInput) -> Iterable[StreamChunk]:
         url = f"{self.base_url}/v1beta/models/{_ensure_models_prefix(input.model)}:streamGenerateContent?alt=sse&key={self.config.api_key}"
         response = request_stream(
@@ -118,6 +151,23 @@ def _build_payload(input: GenerateInput) -> Dict[str, Any]:
     return payload
 
 
+def _build_image_payload(input: ImageGenerateInput) -> Dict[str, Any]:
+    parts: List[Dict[str, Any]] = [{"text": input.prompt}]
+    for image in input.inputImages or []:
+        if image.base64:
+            parts.append(
+                {
+                    "inlineData": {
+                        "mimeType": image.mediaType or "image/png",
+                        "data": image.base64,
+                    }
+                }
+            )
+        elif image.url:
+            parts.append({"fileData": {"fileUri": image.url}})
+    return {"contents": [{"role": "user", "parts": parts}]}
+
+
 def _normalize_output(payload: Dict[str, Any]) -> GenerateOutput:
     text = _extract_text(payload)
     return GenerateOutput(text=text or None, raw=payload)
@@ -131,6 +181,18 @@ def _extract_text(payload: Dict[str, Any]) -> str:
     parts = content.get("parts", []) or []
     texts = [part.get("text", "") for part in parts if part.get("text")]
     return "".join(texts)
+
+
+def _extract_inline_image(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    candidates = payload.get("candidates", []) or []
+    for candidate in candidates:
+        content = candidate.get("content", {}) or {}
+        parts = content.get("parts", []) or []
+        for part in parts:
+            inline = part.get("inlineData")
+            if isinstance(inline, dict) and inline.get("data"):
+                return inline
+    return None
 
 
 def _ensure_models_prefix(model_id: str) -> str:
