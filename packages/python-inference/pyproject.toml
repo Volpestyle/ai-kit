@@ -3,15 +3,22 @@ requires = ["setuptools>=67", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ai-kit"
+name = "ai-kit-inference"
 version = "0.0.0"
-description = "Provider-agnostic model registry and routing for LLM APIs."
+description = "Inference adapters and provider clients for ai-kit."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+  "ai-kit",
+  "requests>=2.31",
+  "replicate>=1.0.0",
+  "pillow>=10.0.0",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["ai_kit*"]
+namespaces = true

@@ -1,7 +1,9 @@
-from .hub import Kit, KitConfig
+from importlib import import_module
+from pkgutil import extend_path
+
 from .catalog import load_catalog_models
+from .errors import AiKitError, ErrorKind
 from .registry import ModelRegistry
-from .router import ModelRouter
 from .types import (
     CostBreakdown,
     EntitlementContext,
@@ -12,6 +14,10 @@ from .types import (
     Message,
     MeshGenerateInput,
     MeshGenerateOutput,
+    AudioInput,
+    TranscribeInput,
+    TranscribeOutput,
+    TranscriptSegment,
     ModelConstraints,
     ModelMetadata,
     ModelRecord,
@@ -22,33 +28,12 @@ from .types import (
     ToolChoice,
     Usage,
 )
-from .errors import AiKitError, ErrorKind
-from .providers import (
-    OpenAIAdapter,
-    OpenAIConfig,
-    AnthropicAdapter,
-    AnthropicConfig,
-    GeminiAdapter,
-    GeminiConfig,
-    XAIAdapter,
-    XAIConfig,
-)
-from .http_asgi import create_asgi_app
-from .testing import (
-    FixtureAdapter,
-    FixtureEntry,
-    FixtureKeyInput,
-    build_stream_chunks,
-    fixture_key,
-)
-from .clients import MeshyClient, MeshyError, MeshyTask, ReplicateClient
+
+__path__ = extend_path(__path__, __name__)
 
 __all__ = [
-    "Kit",
-    "KitConfig",
     "load_catalog_models",
     "ModelRegistry",
-    "ModelRouter",
     "CostBreakdown",
     "EntitlementContext",
     "GenerateInput",
@@ -58,6 +43,10 @@ __all__ = [
     "Message",
     "MeshGenerateInput",
     "MeshGenerateOutput",
+    "AudioInput",
+    "TranscribeInput",
+    "TranscribeOutput",
+    "TranscriptSegment",
     "ModelConstraints",
     "ModelMetadata",
     "ModelRecord",
@@ -69,22 +58,46 @@ __all__ = [
     "Usage",
     "AiKitError",
     "ErrorKind",
-    "OpenAIAdapter",
-    "OpenAIConfig",
-    "AnthropicAdapter",
-    "AnthropicConfig",
-    "GeminiAdapter",
-    "GeminiConfig",
-    "XAIAdapter",
-    "XAIConfig",
-    "create_asgi_app",
-    "FixtureAdapter",
-    "FixtureEntry",
-    "FixtureKeyInput",
-    "build_stream_chunks",
-    "fixture_key",
-    "ReplicateClient",
-    "MeshyClient",
-    "MeshyTask",
-    "MeshyError",
 ]
+
+
+def _optional(module_path: str, names: list[str]) -> None:
+    try:
+        module = import_module(module_path, __name__)
+    except Exception:
+        return
+    for name in names:
+        if hasattr(module, name):
+            globals()[name] = getattr(module, name)
+            __all__.append(name)
+
+
+_optional(".hub", ["Kit", "KitConfig"])
+_optional(".router", ["ModelRouter"])
+_optional(
+    ".providers",
+    [
+        "OpenAIAdapter",
+        "OpenAIConfig",
+        "AnthropicAdapter",
+        "AnthropicConfig",
+        "GeminiAdapter",
+        "GeminiConfig",
+        "XAIAdapter",
+        "XAIConfig",
+        "OllamaAdapter",
+        "OllamaConfig",
+    ],
+)
+_optional(".http_asgi", ["create_asgi_app"])
+_optional(
+    ".testing",
+    [
+        "FixtureAdapter",
+        "FixtureEntry",
+        "FixtureKeyInput",
+        "build_stream_chunks",
+        "fixture_key",
+    ],
+)
+_optional(".clients", ["MeshyClient", "MeshyError", "MeshyTask", "ReplicateClient"])

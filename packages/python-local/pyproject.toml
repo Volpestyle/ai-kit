@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-kit-local"
+version = "0.0.0"
+description = "Local model runners and pipelines for ai-kit."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "ai-kit",
+  "numpy>=1.24.0",
+  "pillow>=10.0.0",
+  "openai-whisper>=20231117",
+  "torch>=2.0.0",
+  "transformers>=4.39.0",
+  "diffusers>=0.27.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["pipeline_zero1to3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ai_kit*"]
+namespaces = true

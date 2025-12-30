@@ -54,6 +54,7 @@ class MeshyClient:
         should_texture: bool = True,
         save_pre_remeshed_model: bool = True,
         enable_pbr: bool = True,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not (1 <= len(image_urls) <= 4):
             raise ValueError("Meshy multi-image-to-3d expects 1 to 4 images")
@@ -66,6 +67,9 @@ class MeshyClient:
             "save_pre_remeshed_model": save_pre_remeshed_model,
             "enable_pbr": enable_pbr,
         }
+        if parameters:
+            payload.update(parameters)
+        payload["image_urls"] = image_urls
         r = self._session.post(url, json=payload, timeout=60)
         if r.status_code >= 400:
             raise MeshyError(f"Meshy create task failed ({r.status_code}): {r.text}")

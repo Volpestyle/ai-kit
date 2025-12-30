@@ -13,13 +13,15 @@ from .types import (
     ImageGenerateOutput,
     MeshGenerateInput,
     MeshGenerateOutput,
+    TranscribeInput,
+    TranscribeOutput,
     ModelMetadata,
     Provider,
     StreamChunk,
     as_json_dict,
 )
 
-FixtureInput = GenerateInput | ImageGenerateInput | MeshGenerateInput
+FixtureInput = GenerateInput | ImageGenerateInput | MeshGenerateInput | TranscribeInput
 
 
 @dataclass
@@ -34,6 +36,7 @@ class FixtureEntry:
     stream: List[StreamChunk] | None = None
     image: ImageGenerateOutput | None = None
     mesh: MeshGenerateOutput | None = None
+    transcribe: TranscribeOutput | None = None
 
 
 @dataclass
@@ -42,6 +45,7 @@ class FixtureCalls:
     stream_generate: List[GenerateInput] = field(default_factory=list)
     generate_image: List[ImageGenerateInput] = field(default_factory=list)
     generate_mesh: List[MeshGenerateInput] = field(default_factory=list)
+    transcribe: List[TranscribeInput] = field(default_factory=list)
 
 
 class FixtureAdapter:
@@ -92,6 +96,13 @@ class FixtureAdapter:
         if entry.mesh is None:
             raise self._missing_fixture_error("mesh", input)
         return entry.mesh
+
+    def transcribe(self, input: TranscribeInput) -> TranscribeOutput:
+        self.calls.transcribe.append(input)
+        entry = self._require_fixture("transcribe", input)
+        if entry.transcribe is None:
+            raise self._missing_fixture_error("transcribe", input)
+        return entry.transcribe
 
     def _require_fixture(self, kind: str, input: FixtureInput):
         key = self.key_fn(FixtureKeyInput(type=kind, input=input))

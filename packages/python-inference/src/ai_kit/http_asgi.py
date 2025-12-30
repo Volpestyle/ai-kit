@@ -6,7 +6,7 @@ from urllib.parse import parse_qs
 
 from .errors import ErrorKind, KitErrorPayload, AiKitError, to_kit_error
 from .hub import Kit
-from .types import GenerateInput, ImageGenerateInput, MeshGenerateInput, as_json_dict
+from .types import GenerateInput, ImageGenerateInput, MeshGenerateInput, TranscribeInput, as_json_dict
 
 ASGIApp = Callable[[Dict[str, Any], Callable[..., Awaitable[Dict[str, Any]]], Callable[..., Awaitable[None]]], Awaitable[None]]
 
@@ -50,6 +50,12 @@ def create_asgi_app(kit: Kit, base_path: str = "") -> ASGIApp:
                 await _respond_text(send, 405, "method not allowed")
                 return
             await _handle_mesh(kit, receive, send)
+            return
+        if path == "/transcribe":
+            if method != "POST":
+                await _respond_text(send, 405, "method not allowed")
+                return
+            await _handle_transcribe(kit, receive, send)
             return
         if path == "/generate/stream":
             if method != "POST":
@@ -108,6 +114,16 @@ async def _handle_mesh(kit: Kit, receive, send) -> None:
         payload = await _read_json(receive)
         input_data = _normalize_mesh_input(payload)
         output = kit.generate_mesh(input_data)
+        await _respond_json(send, 200, as_json_dict(output))
+    except Exception as err:
+        await _send_json_error(send, err)
+
+
+async def _handle_transcribe(kit: Kit, receive, send) -> None:
+    try:
+        payload = await _read_json(receive)
+        input_data = _normalize_transcribe_input(payload)
+        output = kit.transcribe(input_data)
         await _respond_json(send, 200, as_json_dict(output))
     except Exception as err:
         await _send_json_error(send, err)
@@ -294,6 +310,40 @@ def _normalize_mesh_input(payload: Any) -> MeshGenerateInput:
         prompt=prompt,
         inputImages=payload.get("inputImages"),
         format=payload.get("format"),
+    )
+
+
+def _normalize_transcribe_input(payload: Any) -> TranscribeInput:
+    if not isinstance(payload, dict):
+        raise AiKitError(
+            KitErrorPayload(
+                kind=ErrorKind.VALIDATION,
+                message="Request body must be a TranscribeInput object",
+            )
+        )
+    provider = payload.get("provider")
+    model = payload.get("model")
+    audio = payload.get("audio")
+    if not isinstance(provider, str):
+        raise AiKitError(
+            KitErrorPayload(kind=ErrorKind.VALIDATION, message="provider is required and must be a string")
+        )
+    if not isinstance(model, str):
+        raise AiKitError(
+            KitErrorPayload(kind=ErrorKind.VALIDATION, message="model is required and must be a string")
+        )
+    if not isinstance(audio, dict):
+        raise AiKitError(
+            KitErrorPayload(kind=ErrorKind.VALIDATION, message="audio is required and must be an object")
+        )
+    return TranscribeInput(
+        provider=provider,
+        model=model,
+        audio=audio,
+        language=payload.get("language"),
+        prompt=payload.get("prompt"),
+        temperature=payload.get("temperature"),
+        metadata=payload.get("metadata"),
     )
 
 

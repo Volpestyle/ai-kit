@@ -15,6 +15,8 @@ from .types import (
     ImageGenerateOutput,
     MeshGenerateInput,
     MeshGenerateOutput,
+    TranscribeInput,
+    TranscribeOutput,
     Provider,
 )
 from .providers import (
@@ -176,6 +178,43 @@ class Kit:
             )
         try:
             return adapter.generate_mesh(input)
+        except Exception as err:
+            kit_err = to_kit_error(err)
+            self._registry.learn_model_unavailable(entitlement, input.provider, input.model, kit_err)
+            raise kit_err
+
+    def transcribe(self, input: TranscribeInput) -> TranscribeOutput:
+        entitlement = self._entitlement_for_provider(input.provider)
+        if entitlement:
+            return self.transcribe_with_context(entitlement, input)
+        adapter = self._require_adapter(input.provider)
+        if not hasattr(adapter, "transcribe"):
+            raise AiKitError(
+                KitErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message=f"Provider {input.provider} does not support transcription",
+                )
+            )
+        try:
+            return adapter.transcribe(input)
+        except Exception as err:
+            kit_err = to_kit_error(err)
+            self._registry.learn_model_unavailable(None, input.provider, input.model, kit_err)
+            raise kit_err
+
+    def transcribe_with_context(
+        self, entitlement: EntitlementContext | None, input: TranscribeInput
+    ) -> TranscribeOutput:
+        adapter = self._require_adapter(input.provider, entitlement)
+        if not hasattr(adapter, "transcribe"):
+            raise AiKitError(
+                KitErrorPayload(
+                    kind=ErrorKind.UNSUPPORTED,
+                    message=f"Provider {input.provider} does not support transcription",
+                )
+            )
+        try:
+            return adapter.transcribe(input)
         except Exception as err:
             kit_err = to_kit_error(err)
             self._registry.learn_model_unavailable(entitlement, input.provider, input.model, kit_err)

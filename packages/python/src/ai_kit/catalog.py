@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .local.registry import REGISTRY
-from .local import models as _local_models  # register local models
 from .types import ModelCapabilities, ModelMetadata, TokenPrices
 
 _TASK_FAMILY = {
@@ -42,6 +40,12 @@ def _parse_token_prices(raw: Any) -> Optional[TokenPrices]:
     return TokenPrices(input=raw.get("input"), output=raw.get("output"))
 
 
+def _parse_inputs(raw: Any) -> Optional[List[Dict[str, Any]]]:
+    if not isinstance(raw, list):
+        return None
+    return [item for item in raw if isinstance(item, dict)]
+
+
 def _load_models_file(path: Path, provider_override: Optional[str] = None) -> List[ModelMetadata]:
     if not path.exists():
         return []
@@ -61,6 +65,7 @@ def _load_models_file(path: Path, provider_override: Optional[str] = None) -> Li
             continue
         capabilities = _parse_capabilities(entry.get("capabilities"))
         token_prices = _parse_token_prices(entry.get("tokenPrices"))
+        inputs = _parse_inputs(entry.get("inputs"))
         models.append(
             ModelMetadata(
                 id=str(model_id),
@@ -74,6 +79,7 @@ def _load_models_file(path: Path, provider_override: Optional[str] = None) -> Li
                 tokenPrices=token_prices,
                 deprecated=entry.get("deprecated") if "deprecated" in entry else None,
                 inPreview=entry.get("inPreview") if "inPreview" in entry else None,
+                inputs=inputs,
             )
         )
     return models
@@ -88,6 +94,11 @@ def _resolve_models_file(filename: str) -> Optional[Path]:
 
 
 def _load_local_catalog_models() -> List[ModelMetadata]:
+    try:
+        from .local.registry import REGISTRY  # type: ignore
+        from .local import models as _local_models  # type: ignore  # noqa: F401
+    except Exception:
+        return []
     models: List[ModelMetadata] = []
     for spec in REGISTRY.list():
         family = _TASK_FAMILY.get(spec.task)

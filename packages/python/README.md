@@ -1,11 +1,22 @@
 # ai-kit (Python)
 
-Python implementation of ai-kit provider adapters, model registry, router, and
-optional local pipelines for basic vision tasks.
+Core ai-kit types, catalog, and pricing helpers. Inference adapters and local
+pipelines live in separate optional packages.
 
 ## Quickstart
+Core only:
 ```bash
 python -m pip install -e packages/python
+```
+
+Inference adapters:
+```bash
+python -m pip install -e packages/python-inference
+```
+
+Local pipelines:
+```bash
+python -m pip install -e packages/python-local
 ```
 ```py
 import os
@@ -52,6 +63,8 @@ for chunk in stream:
 
 ### Local pipelines (optional)
 Local pipelines rely on `torch`, `transformers`, `Pillow`, and `numpy`.
+Install `packages/python-local` first.
+`ai-kit-local` also ships a `LocalWhisperAdapter` for offline transcription.
 ```py
 from pathlib import Path
 from ai_kit.local import get_pipeline, load_rgb

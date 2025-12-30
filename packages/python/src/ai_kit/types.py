@@ -34,6 +34,7 @@ class ModelMetadata:
     tokenPrices: Optional[TokenPrices] = None
     deprecated: Optional[bool] = None
     inPreview: Optional[bool] = None
+    inputs: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -142,6 +143,15 @@ class ImageInput:
 
 
 @dataclass
+class AudioInput:
+    url: Optional[str] = None
+    base64: Optional[str] = None
+    mediaType: Optional[str] = None
+    fileName: Optional[str] = None
+    path: Optional[str] = None
+
+
+@dataclass
 class Message:
     role: str
     content: List[ContentPart]
@@ -221,6 +231,33 @@ class MeshGenerateInput:
 class MeshGenerateOutput:
     data: str
     format: Optional[str] = None
+    raw: Optional[Any] = None
+
+
+@dataclass
+class TranscriptSegment:
+    start: float
+    end: float
+    text: str
+
+
+@dataclass
+class TranscribeInput:
+    provider: Provider
+    model: str
+    audio: AudioInput
+    language: Optional[str] = None
+    prompt: Optional[str] = None
+    temperature: Optional[float] = None
+    metadata: Optional[Dict[str, str]] = None
+
+
+@dataclass
+class TranscribeOutput:
+    text: Optional[str] = None
+    language: Optional[str] = None
+    duration: Optional[float] = None
+    segments: Optional[List[TranscriptSegment]] = None
     raw: Optional[Any] = None
 
 

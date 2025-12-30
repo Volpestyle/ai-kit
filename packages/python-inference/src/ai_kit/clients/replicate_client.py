@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import io
+import random
+import re
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import replicate
 import requests
@@ -31,12 +34,31 @@ class ReplicateClient:
     Replicate auth is resolved from env var REPLICATE_API_TOKEN by default.
     """
 
-    def __init__(self, *, use_file_output: bool = True):
+    def __init__(
+        self,
+        *,
+        use_file_output: bool = True,
+        max_retries: int = 3,
+        base_delay_s: float = 2.0,
+        max_delay_s: float = 30.0,
+    ):
         self.use_file_output = use_file_output
+        self.max_retries = max(0, max_retries)
+        self.base_delay_s = max(0.1, base_delay_s)
+        self.max_delay_s = max(self.base_delay_s, max_delay_s)
 
     def run(self, model: str, *, inputs: Dict[str, Any]) -> Any:
         # replicate.run(..., use_file_output=...) is supported in replicate>=1.0.0.
-        return replicate.run(model, input=inputs, use_file_output=self.use_file_output)
+        attempt = 0
+        while True:
+            try:
+                return replicate.run(model, input=inputs, use_file_output=self.use_file_output)
+            except Exception as exc:
+                if not self._should_retry(exc, attempt):
+                    raise
+                delay = self._retry_delay(exc, attempt)
+                time.sleep(delay)
+                attempt += 1
 
     def remove_background(
         self,
@@ -45,15 +67,19 @@ class ReplicateClient:
         image_path: Path,
         preserve_partial_alpha: bool = True,
         content_moderation: bool = False,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> bytes:
         with image_path.open("rb") as f:
+            inputs: Dict[str, Any] = {
+                "preserve_partial_alpha": preserve_partial_alpha,
+                "content_moderation": content_moderation,
+            }
+            if parameters:
+                inputs.update(parameters)
+            inputs["image"] = f
             out = self.run(
                 model,
-                inputs={
-                    "image": f,
-                    "preserve_partial_alpha": preserve_partial_alpha,
-                    "content_moderation": content_moderation,
-                },
+                inputs=inputs,
             )
         return self._coerce_single_file(out)
 
@@ -64,15 +90,19 @@ class ReplicateClient:
         image_path: Path,
         remove_background: bool = False,
         return_intermediate_images: bool = False,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[List[bytes], bytes]:
         with image_path.open("rb") as f:
+            inputs: Dict[str, Any] = {
+                "remove_background": remove_background,
+                "return_intermediate_images": return_intermediate_images,
+            }
+            if parameters:
+                inputs.update(parameters)
+            inputs["image"] = f
             out = self.run(
                 model,
-                inputs={
-                    "image": f,
-                    "remove_background": remove_background,
-                    "return_intermediate_images": return_intermediate_images,
-                },
+                inputs=inputs,
             )
         # Common outputs: list[FileOutput] or list[url] or single FileOutput
         if isinstance(out, (list, tuple)):
@@ -84,9 +114,14 @@ class ReplicateClient:
         *,
         model: str,
         image_path: Path,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, bytes]:
         with image_path.open("rb") as f:
-            out = self.run(model, inputs={"image": f})
+            inputs: Dict[str, Any] = {}
+            if parameters:
+                inputs.update(parameters)
+            inputs["image"] = f
+            out = self.run(model, inputs=inputs)
         # Expected dict with keys like "grey_depth" and "color_depth"
         if not isinstance(out, dict):
             # Some model variants might return a single output; normalize.
@@ -109,6 +144,24 @@ class ReplicateClient:
         if isinstance(out, dict) and "url" in out and isinstance(out["url"], str):
             return _download_url(out["url"])
         raise TypeError(f"Unsupported Replicate output type: {type(out)}")
+
+    def _should_retry(self, exc: Exception, attempt: int) -> bool:
+        if attempt >= self.max_retries:
+            return False
+        status = getattr(exc, "status", None) or getattr(exc, "status_code", None)
+        if status == 429:
+            return True
+        message = str(exc).lower()
+        return "429" in message or "throttl" in message or "rate limit" in message
+
+    def _retry_delay(self, exc: Exception, attempt: int) -> float:
+        message = str(exc)
+        match = re.search(r"reset(?:s)? in ~?(\\d+)s", message, re.IGNORECASE)
+        if match:
+            return min(self.max_delay_s, float(match.group(1)) + 1.0)
+        base = min(self.max_delay_s, self.base_delay_s * (2 ** attempt))
+        jitter = random.uniform(0, min(1.0, base * 0.1))
+        return base + jitter
 
     @staticmethod
     def split_grid_image(

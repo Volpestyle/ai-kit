@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.request import urlopen
 
-from ..http import request_json, request_stream
+from ..http import request_json, request_stream, request_multipart
 from ..errors import ErrorKind, KitErrorPayload, AiKitError
 from ..sse import iter_sse_events
 from ..types import (
+    AudioInput,
     GenerateInput,
     GenerateOutput,
     ImageGenerateInput,
@@ -15,6 +19,9 @@ from ..types import (
     Message,
     ModelCapabilities,
     ModelMetadata,
+    TranscriptSegment,
+    TranscribeInput,
+    TranscribeOutput,
     Provider,
     StreamChunk,
     ToolCall,
@@ -119,6 +126,29 @@ class OpenAIAdapter:
                 provider=self.provider,
             )
         )
+
+    def transcribe(self, input: TranscribeInput) -> TranscribeOutput:
+        audio_bytes, filename, media_type = _load_audio_input(input.audio)
+        url = f"{self.base_url}/v1/audio/transcriptions"
+        data: Dict[str, Any] = {
+            "model": input.model,
+            "response_format": "verbose_json",
+        }
+        if input.language:
+            data["language"] = input.language
+        if input.prompt:
+            data["prompt"] = input.prompt
+        if input.temperature is not None:
+            data["temperature"] = input.temperature
+        payload = request_multipart(
+            "POST",
+            url,
+            self._headers(),
+            data=data,
+            file_field=("file", (filename, audio_bytes, media_type)),
+            timeout=self.config.timeout,
+        )
+        return _normalize_transcription_output(payload)
 
     def stream_generate(self, input: GenerateInput) -> Iterable[StreamChunk]:
         if self._should_use_responses(input):
@@ -452,3 +482,81 @@ def _derive_family(model_id: str) -> str:
     if len(parts) >= 2:
         return "-".join(parts[:2])
     return model_id
+
+
+def _normalize_transcription_output(payload: Dict[str, Any]) -> TranscribeOutput:
+    segments_raw = payload.get("segments") or []
+    segments: List[TranscriptSegment] = []
+    for segment in segments_raw:
+        if not isinstance(segment, dict):
+            continue
+        text = segment.get("text")
+        if not isinstance(text, str):
+            continue
+        segments.append(
+            TranscriptSegment(
+                start=float(segment.get("start") or 0),
+                end=float(segment.get("end") or 0),
+                text=text,
+            )
+        )
+    return TranscribeOutput(
+        text=payload.get("text"),
+        language=payload.get("language"),
+        duration=payload.get("duration"),
+        segments=segments or None,
+        raw=payload,
+    )
+
+
+def _load_audio_input(audio: AudioInput | Dict[str, Any]) -> Tuple[bytes, str, str]:
+    normalized = _coerce_audio_input(audio)
+    if normalized.path:
+        data = Path(normalized.path).read_bytes()
+        filename = normalized.fileName or Path(normalized.path).name or "audio"
+        media_type = normalized.mediaType or "application/octet-stream"
+        return data, filename, media_type
+    if normalized.base64:
+        data, media_type = _decode_base64_audio(normalized.base64, normalized.mediaType)
+        filename = normalized.fileName or "audio"
+        return data, filename, media_type
+    if normalized.url:
+        with urlopen(normalized.url) as response:
+            data = response.read()
+            media_type = normalized.mediaType or response.headers.get("content-type", "") or "application/octet-stream"
+        filename = normalized.fileName or "audio"
+        return data, filename, media_type
+    raise AiKitError(
+        KitErrorPayload(
+            kind=ErrorKind.VALIDATION,
+            message="Transcribe input requires audio.url, audio.base64, or audio.path",
+            provider="openai",
+        )
+    )
+
+
+def _coerce_audio_input(audio: AudioInput | Dict[str, Any]) -> AudioInput:
+    if isinstance(audio, AudioInput):
+        return audio
+    if isinstance(audio, dict):
+        return AudioInput(**audio)
+    raise AiKitError(
+        KitErrorPayload(
+            kind=ErrorKind.VALIDATION,
+            message="audio must be an object",
+            provider="openai",
+        )
+    )
+
+
+def _decode_base64_audio(raw: str, explicit_type: Optional[str]) -> Tuple[bytes, str]:
+    payload = raw
+    media_type = explicit_type or ""
+    if raw.startswith("data:"):
+        header, _, rest = raw.partition(",")
+        payload = rest
+        if not media_type and ";" in header:
+            media_type = header.split(";", 1)[0].replace("data:", "")
+    if not media_type:
+        media_type = "application/octet-stream"
+    return base64.b64decode(payload), media_type
