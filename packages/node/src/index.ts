@@ -26,4 +26,4 @@ export type {
   ResponseFormat,
 } from "./core/types.js";
 export { Provider } from "./core/types.js";
-export { InferenceKitError } from "./core/errors.js";
+export { AiKitError } from "./core/errors.js";

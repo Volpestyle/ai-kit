@@ -4,7 +4,7 @@ import json
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional
 from urllib.parse import parse_qs
 
-from .errors import ErrorKind, KitErrorPayload, InferenceKitError, to_kit_error
+from .errors import ErrorKind, KitErrorPayload, AiKitError, to_kit_error
 from .hub import Kit
 from .types import GenerateInput, ImageGenerateInput, MeshGenerateInput, as_json_dict
 
@@ -155,13 +155,13 @@ async def _read_body(receive) -> bytes:
 async def _read_json(receive) -> Any:
     body = await _read_body(receive)
     if not body:
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="Body must be valid JSON")
         )
     try:
         return json.loads(body.decode("utf-8"))
     except json.JSONDecodeError as exc:
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="Body must be valid JSON")
         ) from exc
 
@@ -196,7 +196,7 @@ def _should_refresh(values: Iterable[str]) -> bool:
 
 def _normalize_generate_input(payload: Any, force_stream: bool = False) -> GenerateInput:
     if not isinstance(payload, dict):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.VALIDATION,
                 message="Request body must be a GenerateInput object",
@@ -206,15 +206,15 @@ def _normalize_generate_input(payload: Any, force_stream: bool = False) -> Gener
     model = payload.get("model")
     messages = payload.get("messages")
     if not isinstance(provider, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="provider is required and must be a string")
         )
     if not isinstance(model, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="model is required and must be a string")
         )
     if not isinstance(messages, list):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="messages is required and must be an array")
         )
     return GenerateInput(
@@ -234,7 +234,7 @@ def _normalize_generate_input(payload: Any, force_stream: bool = False) -> Gener
 
 def _normalize_image_input(payload: Any) -> ImageGenerateInput:
     if not isinstance(payload, dict):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.VALIDATION,
                 message="Request body must be an ImageGenerateInput object",
@@ -244,15 +244,15 @@ def _normalize_image_input(payload: Any) -> ImageGenerateInput:
     model = payload.get("model")
     prompt = payload.get("prompt")
     if not isinstance(provider, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="provider is required and must be a string")
         )
     if not isinstance(model, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="model is required and must be a string")
         )
     if not isinstance(prompt, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="prompt is required and must be a string")
         )
     return ImageGenerateInput(
@@ -261,12 +261,13 @@ def _normalize_image_input(payload: Any) -> ImageGenerateInput:
         prompt=prompt,
         size=payload.get("size"),
         inputImages=payload.get("inputImages"),
+        parameters=payload.get("parameters"),
     )
 
 
 def _normalize_mesh_input(payload: Any) -> MeshGenerateInput:
     if not isinstance(payload, dict):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.VALIDATION,
                 message="Request body must be a MeshGenerateInput object",
@@ -276,15 +277,15 @@ def _normalize_mesh_input(payload: Any) -> MeshGenerateInput:
     model = payload.get("model")
     prompt = payload.get("prompt")
     if not isinstance(provider, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="provider is required and must be a string")
         )
     if not isinstance(model, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="model is required and must be a string")
         )
     if not isinstance(prompt, str):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="prompt is required and must be a string")
         )
     return MeshGenerateInput(
@@ -351,7 +352,7 @@ async def _send_json_error(send, err: Exception) -> None:
     await _respond_json(send, status, payload)
 
 
-def _map_status(err: InferenceKitError) -> int:
+def _map_status(err: AiKitError) -> int:
     if err.kind in (ErrorKind.VALIDATION, ErrorKind.UNSUPPORTED):
         return 400
     if err.kind == ErrorKind.PROVIDER_AUTH:

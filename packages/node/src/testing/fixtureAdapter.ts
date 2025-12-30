@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { InferenceKitError } from "../core/errors.js";
+import { AiKitError } from "../core/errors.js";
 import {
   ErrorKind,
   GenerateInput,
@@ -120,7 +120,7 @@ export class FixtureAdapter implements ProviderAdapter {
     const key = this.resolveKey(input);
     const entry = this.fixtures[key];
     if (!entry) {
-      throw new InferenceKitError({
+      throw new AiKitError({
         kind: ErrorKind.Validation,
         message: `Fixture not found (key: ${key}).`,
         provider: this.provider,
@@ -132,9 +132,9 @@ export class FixtureAdapter implements ProviderAdapter {
   private missingFixtureError(
     type: FixtureKeyInput["type"],
     input: GenerateInput | ImageGenerateInput | MeshGenerateInput,
-  ): InferenceKitError {
+  ): AiKitError {
     const key = this.resolveKey({ type, input } as FixtureKeyInput);
-    return new InferenceKitError({
+    return new AiKitError({
       kind: ErrorKind.Validation,
       message: `Fixture for ${type} is missing (key: ${key}).`,
       provider: this.provider,

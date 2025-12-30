@@ -1,4 +1,5 @@
 from .hub import Kit, KitConfig
+from .catalog import load_catalog_models
 from .registry import ModelRegistry
 from .router import ModelRouter
 from .types import (
@@ -21,7 +22,7 @@ from .types import (
     ToolChoice,
     Usage,
 )
-from .errors import InferenceKitError, ErrorKind
+from .errors import AiKitError, ErrorKind
 from .providers import (
     OpenAIAdapter,
     OpenAIConfig,
@@ -40,10 +41,12 @@ from .testing import (
     build_stream_chunks,
     fixture_key,
 )
+from .clients import MeshyClient, MeshyError, MeshyTask, ReplicateClient
 
 __all__ = [
     "Kit",
     "KitConfig",
+    "load_catalog_models",
     "ModelRegistry",
     "ModelRouter",
     "CostBreakdown",
@@ -64,7 +67,7 @@ __all__ = [
     "ToolDefinition",
     "ToolChoice",
     "Usage",
-    "InferenceKitError",
+    "AiKitError",
     "ErrorKind",
     "OpenAIAdapter",
     "OpenAIConfig",
@@ -80,4 +83,8 @@ __all__ = [
     "FixtureKeyInput",
     "build_stream_chunks",
     "fixture_key",
+    "ReplicateClient",
+    "MeshyClient",
+    "MeshyTask",
+    "MeshyError",
 ]

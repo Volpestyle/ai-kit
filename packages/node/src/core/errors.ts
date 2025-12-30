@@ -1,6 +1,6 @@
 import { ErrorKind, KitErrorPayload, Provider } from "./types.js";
 
-export class InferenceKitError extends Error {
+export class AiKitError extends Error {
   public readonly kind: ErrorKind;
   public readonly provider?: Provider;
   public readonly upstreamStatus?: number;
@@ -10,7 +10,7 @@ export class InferenceKitError extends Error {
 
   constructor(payload: KitErrorPayload) {
     super(payload.message);
-    this.name = "InferenceKitError";
+    this.name = "AiKitError";
     this.kind = payload.kind;
     this.provider = payload.provider;
     this.upstreamStatus = payload.upstreamStatus;
@@ -20,13 +20,13 @@ export class InferenceKitError extends Error {
   }
 }
 
-export function toKitError(err: unknown): InferenceKitError {
-  if (err instanceof InferenceKitError) {
+export function toKitError(err: unknown): AiKitError {
+  if (err instanceof AiKitError) {
     return err;
   }
   const message =
     err instanceof Error ? err.message : "Unexpected provider error";
-  return new InferenceKitError({
+  return new AiKitError({
     kind: ErrorKind.Unknown,
     message,
     cause: err,
@@ -39,8 +39,8 @@ export function ensureKitError(
   upstreamStatus?: number,
   upstreamCode?: string,
   requestId?: string,
-): InferenceKitError {
-  return new InferenceKitError({
+): AiKitError {
+  return new AiKitError({
     kind: classifyStatus(upstreamStatus),
     message,
     provider,

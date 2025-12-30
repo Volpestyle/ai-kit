@@ -27,7 +27,7 @@ class KitErrorPayload:
     cause: Optional[Exception] = None
 
 
-class InferenceKitError(Exception):
+class AiKitError(Exception):
     def __init__(self, payload: KitErrorPayload):
         super().__init__(payload.message)
         self.kind = payload.kind
@@ -52,9 +52,9 @@ def classify_status(status: Optional[int]) -> ErrorKind:
     return ErrorKind.UNKNOWN
 
 
-def to_kit_error(err: Exception) -> InferenceKitError:
-    if isinstance(err, InferenceKitError):
+def to_kit_error(err: Exception) -> AiKitError:
+    if isinstance(err, AiKitError):
         return err
-    return InferenceKitError(
+    return AiKitError(
         KitErrorPayload(kind=ErrorKind.UNKNOWN, message=str(err), cause=err)
     )

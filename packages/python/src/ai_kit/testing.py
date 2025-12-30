@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Iterable, List
 
-from .errors import ErrorKind, InferenceKitError, KitErrorPayload
+from .errors import ErrorKind, AiKitError, KitErrorPayload
 from .types import (
     GenerateInput,
     GenerateOutput,
@@ -97,7 +97,7 @@ class FixtureAdapter:
         key = self.key_fn(FixtureKeyInput(type=kind, input=input))
         entry = self.fixtures.get(key)
         if entry is None:
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.VALIDATION,
                     message=f"Fixture not found (key: {key}).",
@@ -106,9 +106,9 @@ class FixtureAdapter:
             )
         return entry
 
-    def _missing_fixture_error(self, kind: str, input: FixtureInput) -> InferenceKitError:
+    def _missing_fixture_error(self, kind: str, input: FixtureInput) -> AiKitError:
         key = self.key_fn(FixtureKeyInput(type=kind, input=input))
-        return InferenceKitError(
+        return AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.VALIDATION,
                 message=f"Fixture for {kind} is missing (key: {key}).",
