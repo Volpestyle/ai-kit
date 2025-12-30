@@ -11,7 +11,21 @@
       "tool_use": false,
       "structured_output": false,
       "reasoning": false
-    }
+    },
+    "inputs": [
+      {
+        "name": "preserve_partial_alpha",
+        "label": "Preserve partial alpha",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "name": "content_moderation",
+        "label": "Content moderation",
+        "type": "boolean",
+        "default": false
+      }
+    ]
   },
   {
     "id": "chenxwh/depth-anything-v2",
@@ -25,7 +39,8 @@
       "tool_use": false,
       "structured_output": false,
       "reasoning": false
-    }
+    },
+    "inputs": []
   },
   {
     "id": "jd7h/zero123plusplus",
@@ -39,6 +54,20 @@
       "tool_use": false,
       "structured_output": false,
       "reasoning": false
-    }
+    },
+    "inputs": [
+      {
+        "name": "remove_background",
+        "label": "Remove background",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "name": "return_intermediate_images",
+        "label": "Return intermediate images",
+        "type": "boolean",
+        "default": false
+      }
+    ]
   }
 ]

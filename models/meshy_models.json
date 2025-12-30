@@ -11,6 +11,32 @@
       "tool_use": false,
       "structured_output": false,
       "reasoning": false
-    }
+    },
+    "inputs": [
+      {
+        "name": "should_remesh",
+        "label": "Remesh",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "name": "should_texture",
+        "label": "Texture",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "name": "save_pre_remeshed_model",
+        "label": "Save pre-remesh model",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "name": "enable_pbr",
+        "label": "Enable PBR",
+        "type": "boolean",
+        "default": true
+      }
+    ]
   }
 ]
