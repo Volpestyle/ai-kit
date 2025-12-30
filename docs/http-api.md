@@ -9,6 +9,7 @@ For SSE, the ASGI adapter is a good fit because it supports native streaming.
 - `POST /generate` -> text generation
 - `POST /image` -> image generation
 - `POST /mesh` -> mesh generation
+- `POST /transcribe` -> audio transcription
 - `POST /generate/stream` -> SSE stream
 
 ## Example: list models
@@ -45,6 +46,17 @@ curl -N -X POST http://localhost:3000/generate/stream \
 ```
 
 SSE responses emit `event: chunk` payloads as JSON and finish with `event: done`.
+
+## Example: transcribe
+```bash
+curl -X POST http://localhost:3000/transcribe \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "provider": "openai",
+    "model": "whisper-1",
+    "audio": { "base64": "<base64 audio>" }
+  }'
+```
 
 ## Python (ASGI adapter)
 The Python SDK exposes a minimal ASGI app that you can mount in an existing server. It serves

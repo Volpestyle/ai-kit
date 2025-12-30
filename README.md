@@ -50,8 +50,9 @@ console.log(output.text);
 
 ### Go
 ```bash
-go get github.com/Volpestyle/ai-kit/packages/go
+go get github.com/Volpestyle/ai-kit/packages/go@latest
 ```
+Releases are tagged with `packages/go/vX.Y.Z`.
 ```go
 package main
 

@@ -2,11 +2,11 @@
 
 ## Overview
 ai-kit is a monorepo that standardizes model discovery, routing, and inference across
-Node.js, Go, and Python. Each SDK exposes a Kit for generation, a model registry with caching,
+Node.js, Go, and Python. Each SDK exposes a Kit for generation, transcription, a model registry with caching,
 optional model routing, and SSE support for progressive UI rendering.
 
 Key building blocks:
-- Kit: orchestration layer for list, generate, and stream.
+- Kit: orchestration layer for list, generate, transcribe, and stream.
 - Model registry: caches provider model lists, applies scraped metadata and pricing.
 - Model router: resolves a preferred or cheapest model based on constraints.
 - Provider adapters: OpenAI, Anthropic, Google Gemini, xAI, and Ollama.
