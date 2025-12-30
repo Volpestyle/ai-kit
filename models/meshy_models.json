@@ -1,0 +1,16 @@
+[
+  {
+    "id": "multi-image-to-3d",
+    "provider": "meshy",
+    "displayName": "Meshy Multi-Image to 3D",
+    "family": "recon",
+    "capabilities": {
+      "text": false,
+      "vision": false,
+      "image": true,
+      "tool_use": false,
+      "structured_output": false,
+      "reasoning": false
+    }
+  }
+]

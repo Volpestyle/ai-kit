@@ -1,0 +1,44 @@
+[
+  {
+    "id": "bria/remove-background",
+    "provider": "replicate",
+    "displayName": "Bria Remove Background",
+    "family": "cutout",
+    "capabilities": {
+      "text": false,
+      "vision": false,
+      "image": true,
+      "tool_use": false,
+      "structured_output": false,
+      "reasoning": false
+    }
+  },
+  {
+    "id": "chenxwh/depth-anything-v2",
+    "provider": "replicate",
+    "displayName": "Depth Anything v2",
+    "family": "depth",
+    "capabilities": {
+      "text": false,
+      "vision": false,
+      "image": true,
+      "tool_use": false,
+      "structured_output": false,
+      "reasoning": false
+    }
+  },
+  {
+    "id": "jd7h/zero123plusplus",
+    "provider": "replicate",
+    "displayName": "Zero123++",
+    "family": "views",
+    "capabilities": {
+      "text": false,
+      "vision": false,
+      "image": true,
+      "tool_use": false,
+      "structured_output": false,
+      "reasoning": false
+    }
+  }
+]
