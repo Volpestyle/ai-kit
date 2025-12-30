@@ -2,16 +2,27 @@
 
 Provider-agnostic inference tooling for Node.js, Go, and Python. The repo standardizes model
 listing, routing, generation, streaming (SSE), and cost estimation across OpenAI, Anthropic,
-Google Gemini, xAI, and local Ollama endpoints. It also ships shared curated model metadata
-and a reference OpenAPI spec for HTTP servers.
+Google Gemini, xAI, and local Ollama endpoints. It also ships shared model metadata
+(scraped per provider + manual catalogs) and a reference OpenAPI spec for HTTP servers.
 
 ## Packages
 - `packages/node`: Node.js SDK and HTTP handlers
 - `packages/go`: Go SDK and HTTP handlers
 - `packages/python`: Python SDK + local pipelines for basic vision tasks
-- `models`: shared curated model metadata and optional catalog models
+- `models`: shared model metadata (scraped + manual catalogs)
 - `servers/openapi.yaml`: reference HTTP API
 - `docs`: architecture overview and HTTP notes
+
+## Model metadata
+ai-kit keeps two sources of model metadata:
+- Scraped provider pricing/capabilities in `models/<provider>/scraped_models.json`
+  (generated via `pnpm refresh:models`).
+- Manually curated catalogs for providers without scrape support
+  (ex: `models/replicate_models.json`, `models/meshy_models.json`), including `family`
+  tags used by pipeline UIs.
+
+Scraped metadata is intended to supplement provider `/models` listings with pricing and
+capabilities, while manual catalogs define which non-scraped models should appear in UIs.
 
 ## Quickstart
 ### Node.js
