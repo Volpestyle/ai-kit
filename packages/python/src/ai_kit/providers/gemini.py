@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
 from ..http import request_json, request_stream
-from ..errors import ErrorKind, KitErrorPayload, InferenceKitError
+from ..errors import ErrorKind, KitErrorPayload, AiKitError
 from ..sse import iter_sse_events
 from ..types import (
     GenerateInput,
@@ -52,6 +52,7 @@ class GeminiAdapter:
                     capabilities=ModelCapabilities(
                         text=True,
                         vision=True,
+                        image=False,
                         tool_use=True,
                         structured_output=True,
                         reasoning=False,
@@ -62,7 +63,8 @@ class GeminiAdapter:
         return models
 
     def generate(self, input: GenerateInput) -> GenerateOutput:
-        url = f"{self.base_url}/v1beta/models/{_ensure_models_prefix(input.model)}:generateContent?key={self.config.api_key}"
+        model_id = _normalize_model_id(input.model)
+        url = f"{self.base_url}/v1beta/models/{model_id}:generateContent?key={self.config.api_key}"
         payload = request_json(
             "POST",
             url,
@@ -73,7 +75,8 @@ class GeminiAdapter:
         return _normalize_output(payload)
 
     def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
-        url = f"{self.base_url}/v1beta/models/{_ensure_models_prefix(input.model)}:generateContent?key={self.config.api_key}"
+        model_id = _normalize_model_id(input.model)
+        url = f"{self.base_url}/v1beta/models/{model_id}:generateContent?key={self.config.api_key}"
         payload = request_json(
             "POST",
             url,
@@ -83,7 +86,7 @@ class GeminiAdapter:
         )
         inline = _extract_inline_image(payload)
         if not inline or not inline.get("data"):
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNKNOWN,
                     message="Gemini image response missing inline data",
@@ -94,7 +97,7 @@ class GeminiAdapter:
         return ImageGenerateOutput(mime=mime, data=inline["data"], raw=payload)
 
     def generate_mesh(self, input: "MeshGenerateInput"):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.UNSUPPORTED,
                 message="Gemini mesh generation is not supported",
@@ -103,7 +106,8 @@ class GeminiAdapter:
         )
 
     def stream_generate(self, input: GenerateInput) -> Iterable[StreamChunk]:
-        url = f"{self.base_url}/v1beta/models/{_ensure_models_prefix(input.model)}:streamGenerateContent?alt=sse&key={self.config.api_key}"
+        model_id = _normalize_model_id(input.model)
+        url = f"{self.base_url}/v1beta/models/{model_id}:streamGenerateContent?alt=sse&key={self.config.api_key}"
         response = request_stream(
             "POST",
             url,
@@ -195,10 +199,10 @@ def _extract_inline_image(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _ensure_models_prefix(model_id: str) -> str:
+def _normalize_model_id(model_id: str) -> str:
     if model_id.startswith("models/"):
-        return model_id
-    return f"models/{model_id}"
+        return model_id[len("models/"):]
+    return model_id
 
 
 def _derive_family(model_id: str) -> str:

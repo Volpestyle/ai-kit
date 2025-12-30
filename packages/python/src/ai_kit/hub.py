@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Callable, Dict
 
-from .catalog import CatalogAdapter, load_catalog_models
-from .errors import ErrorKind, KitErrorPayload, InferenceKitError, to_kit_error
+from .errors import ErrorKind, KitErrorPayload, AiKitError, to_kit_error
 from .entitlements import fingerprint_api_key
 from .pricing import estimate_cost
 from .registry import ModelRegistry
@@ -55,14 +54,12 @@ class _KeyPool:
 
 class Kit:
     def __init__(self, config: KitConfig) -> None:
-        catalog_models = load_catalog_models()
         if (
             not config.providers
             and not config.adapters
             and not config.adapter_factory
-            and not catalog_models
         ):
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.VALIDATION,
                     message="At least one provider configuration or adapter is required",
@@ -73,8 +70,6 @@ class Kit:
         if config.adapters:
             self._adapters.update(config.adapters)
         self._external_adapter_factory = config.adapter_factory
-        if catalog_models:
-            self._adapters["catalog"] = CatalogAdapter(catalog_models)
         self._registry = ModelRegistry(
             self._adapters,
             ttl_seconds=config.registry_ttl_seconds,
@@ -118,7 +113,7 @@ class Kit:
             return self.generate_image_with_context(entitlement, input)
         adapter = self._require_adapter(input.provider)
         if not hasattr(adapter, "generate_image"):
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNSUPPORTED,
                     message=f"Provider {input.provider} does not support image generation",
@@ -136,7 +131,7 @@ class Kit:
     ) -> ImageGenerateOutput:
         adapter = self._require_adapter(input.provider, entitlement)
         if not hasattr(adapter, "generate_image"):
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNSUPPORTED,
                     message=f"Provider {input.provider} does not support image generation",
@@ -155,7 +150,7 @@ class Kit:
             return self.generate_mesh_with_context(entitlement, input)
         adapter = self._require_adapter(input.provider)
         if not hasattr(adapter, "generate_mesh"):
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNSUPPORTED,
                     message=f"Provider {input.provider} does not support mesh generation",
@@ -173,7 +168,7 @@ class Kit:
     ) -> MeshGenerateOutput:
         adapter = self._require_adapter(input.provider, entitlement)
         if not hasattr(adapter, "generate_mesh"):
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNSUPPORTED,
                     message=f"Provider {input.provider} does not support mesh generation",
@@ -226,7 +221,7 @@ class Kit:
                     normalized[provider] = cfg
                 continue
             if not keys:
-                raise InferenceKitError(
+                raise AiKitError(
                     KitErrorPayload(
                         kind=ErrorKind.VALIDATION,
                         message=f"Provider {provider} api key is required",
@@ -277,8 +272,6 @@ class Kit:
             adapter = self._external_adapter_factory(provider, entitlement)
             if adapter is not None:
                 return adapter
-        if provider == "catalog":
-            return self._adapters.get(provider)
         if not entitlement or not entitlement.apiKey:
             return self._adapters.get(provider)
         base_config = self._providers.get(provider)
@@ -329,7 +322,7 @@ class Kit:
     def _require_adapter(self, provider: Provider, entitlement: EntitlementContext | None = None):
         adapter = self._adapter_factory(provider, entitlement)
         if not adapter:
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.VALIDATION,
                     message=f"Provider {provider} is not configured",

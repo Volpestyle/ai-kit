@@ -252,6 +252,7 @@ export interface ImageGenerateInput {
   prompt: string;
   size?: string;
   inputImages?: ImageInput[];
+  parameters?: Record<string, unknown>;
 }
 
 export interface ImageGenerateOutput {

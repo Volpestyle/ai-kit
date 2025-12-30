@@ -14,7 +14,7 @@ import {
   ToolDefinition,
   Usage,
 } from "../core/types.js";
-import { InferenceKitError } from "../core/errors.js";
+import { AiKitError } from "../core/errors.js";
 import { ErrorKind } from "../core/types.js";
 import { parseEventData, streamSSE } from "../core/stream.js";
 
@@ -131,7 +131,7 @@ export class GoogleAdapter implements ProviderAdapter {
     );
     const image = extractInlineImage(response);
     if (!image) {
-      throw new InferenceKitError({
+      throw new AiKitError({
         kind: ErrorKind.Unknown,
         message: "Gemini image response missing inline data",
         provider: this.provider,
@@ -271,7 +271,7 @@ export class GoogleAdapter implements ProviderAdapter {
   private async fetchRaw(path: string, init: RequestInit): Promise<Response> {
     const fetchImpl = this.fetchImpl ?? globalThis.fetch;
     if (!fetchImpl) {
-      throw new InferenceKitError({
+      throw new AiKitError({
         kind: ErrorKind.Unsupported,
         message: "global fetch is not available",
         provider: this.provider,
@@ -282,7 +282,7 @@ export class GoogleAdapter implements ProviderAdapter {
     const response = await fetchImpl(url, init);
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new InferenceKitError({
+      throw new AiKitError({
         kind:
           response.status === 401 || response.status === 403
             ? ErrorKind.ProviderAuth

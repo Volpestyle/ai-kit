@@ -92,13 +92,6 @@ func (a *anthropicAdapter) ListModels(ctx context.Context) ([]ModelMetadata, err
 			DisplayName: model.ID,
 			Provider:    a.provider,
 			Family:      deriveFamily(model.ID),
-			Capabilities: ModelCapabilities{
-				Text:             true,
-				Vision:           true,
-				ToolUse:          true,
-				StructuredOutput: true,
-				Reasoning:        false,
-			},
 		})
 	}
 	return models, nil

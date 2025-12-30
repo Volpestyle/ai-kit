@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
 from ..http import request_json, request_stream
-from ..errors import ErrorKind, KitErrorPayload, InferenceKitError
+from ..errors import ErrorKind, KitErrorPayload, AiKitError
 from ..sse import iter_sse_events
 from ..types import (
     GenerateInput,
@@ -59,6 +59,7 @@ class OpenAIAdapter:
                     capabilities=ModelCapabilities(
                         text=True,
                         vision=False,
+                        image=False,
                         tool_use=True,
                         structured_output=False,
                         reasoning=False,
@@ -76,7 +77,7 @@ class OpenAIAdapter:
 
     def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
         if input.inputImages:
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNSUPPORTED,
                     message="OpenAI image edits are not supported in this adapter",
@@ -101,7 +102,7 @@ class OpenAIAdapter:
         image = data[0] if data else {}
         b64 = image.get("b64_json")
         if not b64:
-            raise InferenceKitError(
+            raise AiKitError(
                 KitErrorPayload(
                     kind=ErrorKind.UNKNOWN,
                     message="OpenAI image response missing base64 data",
@@ -111,7 +112,7 @@ class OpenAIAdapter:
         return ImageGenerateOutput(mime="image/png", data=b64, raw=payload)
 
     def generate_mesh(self, input: "MeshGenerateInput"):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.UNSUPPORTED,
                 message="OpenAI mesh generation is not supported",

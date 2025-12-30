@@ -67,13 +67,6 @@ func (g *googleAdapter) ListModels(ctx context.Context) ([]ModelMetadata, error)
 			DisplayName: model.DisplayName,
 			Provider:    ProviderGoogle,
 			Family:      deriveFamily(id),
-			Capabilities: ModelCapabilities{
-				Text:             true,
-				Vision:           true,
-				ToolUse:          true,
-				StructuredOutput: true,
-				Reasoning:        false,
-			},
 			ContextWindow: model.InputTokenLimit,
 		})
 	}

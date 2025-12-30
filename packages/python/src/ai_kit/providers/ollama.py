@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .openai import OpenAIAdapter, OpenAIConfig
-from ..errors import ErrorKind, InferenceKitError, KitErrorPayload
+from ..errors import ErrorKind, AiKitError, KitErrorPayload
 from ..types import ImageGenerateInput, ImageGenerateOutput, Provider
 
 
@@ -28,7 +28,7 @@ class OllamaAdapter(OpenAIAdapter):
         super().__init__(openai_config, provider=provider)
 
     def generate_image(self, input: ImageGenerateInput) -> ImageGenerateOutput:
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.UNSUPPORTED,
                 message="Ollama image generation is not supported",
@@ -37,7 +37,7 @@ class OllamaAdapter(OpenAIAdapter):
         )
 
     def generate_mesh(self, input: "MeshGenerateInput"):
-        raise InferenceKitError(
+        raise AiKitError(
             KitErrorPayload(
                 kind=ErrorKind.UNSUPPORTED,
                 message="Ollama mesh generation is not supported",

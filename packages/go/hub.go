@@ -9,14 +9,14 @@ import (
 )
 
 type Config struct {
-	OpenAI      *OpenAIConfig
-	Anthropic   *AnthropicConfig
-	XAI         *XAIConfig
-	Google      *GoogleConfig
-	Ollama      *OllamaConfig
-	HTTPClient  *http.Client
-	RegistryTTL time.Duration
-	Adapters    map[Provider]ProviderAdapter
+	OpenAI         *OpenAIConfig
+	Anthropic      *AnthropicConfig
+	XAI            *XAIConfig
+	Google         *GoogleConfig
+	Ollama         *OllamaConfig
+	HTTPClient     *http.Client
+	RegistryTTL    time.Duration
+	Adapters       map[Provider]ProviderAdapter
 	AdapterFactory AdapterFactory
 }
 
@@ -135,9 +135,6 @@ func New(config Config) (*Kit, error) {
 		}
 		adapters[ProviderOllama] = newOllamaAdapter(&cfg, client)
 	}
-	if catalog := newCatalogAdapter(); catalog != nil && adapters[ProviderCatalog] == nil {
-		adapters[ProviderCatalog] = catalog
-	}
 	if len(adapters) == 0 && config.AdapterFactory == nil {
 		return nil, fmt.Errorf("at least one provider config or adapter is required")
 	}
@@ -159,11 +156,30 @@ func New(config Config) (*Kit, error) {
 }
 
 func (h *Kit) ListModels(ctx context.Context, opts *ListModelsOptions) ([]ModelMetadata, error) {
-	return h.registry.List(ctx, opts)
+	models, err := h.registry.List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	annotateModelAvailability(models, h.adapters)
+	return models, nil
 }
 
 func (h *Kit) ListModelRecords(ctx context.Context, opts *ListModelsOptions) ([]ModelRecord, error) {
 	return h.registry.ListRecords(ctx, opts)
+}
+
+func annotateModelAvailability(models []ModelMetadata, adapters map[Provider]ProviderAdapter) {
+	if len(models) == 0 {
+		return
+	}
+	availableProviders := make(map[Provider]struct{}, len(adapters)+1)
+	for provider := range adapters {
+		availableProviders[provider] = struct{}{}
+	}
+	for idx, model := range models {
+		_, ok := availableProviders[model.Provider]
+		models[idx].Available = ok
+	}
 }
 
 func (h *Kit) Generate(ctx context.Context, in GenerateInput) (GenerateOutput, error) {
@@ -287,8 +303,8 @@ func (h *Kit) entitlementForProvider(provider Provider) *EntitlementContext {
 		return nil
 	}
 	return &EntitlementContext{
-		Provider:         provider,
-		APIKey:           key,
+		Provider:          provider,
+		APIKey:            key,
 		APIKeyFingerprint: FingerprintAPIKey(key),
 	}
 }
@@ -320,12 +336,6 @@ func attachCostToStream(provider Provider, model string, stream <-chan StreamChu
 
 func newAdapterFactory(config Config, client *http.Client, adapters map[Provider]ProviderAdapter) AdapterFactory {
 	return func(provider Provider, entitlement *EntitlementContext) (ProviderAdapter, error) {
-		if provider == ProviderCatalog {
-			if adapter, ok := adapters[provider]; ok {
-				return adapter, nil
-			}
-			return nil, fmt.Errorf("provider %s is not configured", provider)
-		}
 		if entitlement == nil || strings.TrimSpace(entitlement.APIKey) == "" {
 			if adapter, ok := adapters[provider]; ok {
 				return adapter, nil
@@ -355,22 +365,22 @@ func newAdapterFactory(config Config, client *http.Client, adapters map[Provider
 			cfg := *config.XAI
 			cfg.APIKey = apiKey
 			return newXAIAdapter(&cfg, client), nil
-	case ProviderGoogle:
-		if config.Google == nil {
-			return nil, fmt.Errorf("google config is not available")
+		case ProviderGoogle:
+			if config.Google == nil {
+				return nil, fmt.Errorf("google config is not available")
+			}
+			cfg := *config.Google
+			cfg.APIKey = apiKey
+			return newGoogleAdapter(&cfg, client), nil
+		case ProviderOllama:
+			if config.Ollama == nil {
+				return nil, fmt.Errorf("ollama config is not available")
+			}
+			cfg := *config.Ollama
+			cfg.APIKey = apiKey
+			return newOllamaAdapter(&cfg, client), nil
+		default:
+			return nil, fmt.Errorf("provider %s is not configured", provider)
 		}
-		cfg := *config.Google
-		cfg.APIKey = apiKey
-		return newGoogleAdapter(&cfg, client), nil
-	case ProviderOllama:
-		if config.Ollama == nil {
-			return nil, fmt.Errorf("ollama config is not available")
-		}
-		cfg := *config.Ollama
-		cfg.APIKey = apiKey
-		return newOllamaAdapter(&cfg, client), nil
-	default:
-		return nil, fmt.Errorf("provider %s is not configured", provider)
 	}
-}
 }

@@ -11,6 +11,7 @@ Provider = str
 class ModelCapabilities:
     text: bool
     vision: bool
+    image: bool
     tool_use: bool
     structured_output: bool
     reasoning: bool
@@ -196,6 +197,7 @@ class ImageGenerateInput:
     prompt: str
     size: Optional[str] = None
     inputImages: Optional[List[ImageInput]] = None
+    parameters: Optional[Dict[str, Any]] = None
 
 
 @dataclass

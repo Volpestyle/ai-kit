@@ -168,13 +168,6 @@ func (a *openAIAdapter) ListModels(ctx context.Context) ([]ModelMetadata, error)
 			DisplayName: model.ID,
 			Provider:    a.provider,
 			Family:      deriveFamily(model.ID),
-			Capabilities: ModelCapabilities{
-				Text:             true,
-				Vision:           false,
-				ToolUse:          true,
-				StructuredOutput: false,
-				Reasoning:        false,
-			},
 		})
 	}
 	return models, nil
