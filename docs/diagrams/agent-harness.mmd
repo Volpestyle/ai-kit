@@ -1,0 +1,19 @@
+flowchart TD
+  Agent[Custom Agent Harness]
+  Policy[Model Policy + Router]
+  Registry[Model Registry]
+  Kit[ai-kit Kit]
+  Adapters[Provider Adapters]
+  Providers[OpenAI / Anthropic / Gemini / Ollama]
+  Tools[Tool Executor]
+
+  Agent -->|List model records| Registry
+  Registry -->|Model records| Policy
+  Policy -->|Chosen provider/model| Agent
+  Agent -->|Generate or Stream| Kit
+  Agent -->|Image or Transcribe| Kit
+  Kit --> Adapters
+  Adapters --> Providers
+  Kit -->|Tool calls| Tools
+  Tools -->|Results| Agent
+  Kit -->|Outputs| Agent

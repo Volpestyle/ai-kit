@@ -28,7 +28,7 @@
     ]
   },
   {
-    "id": "chenxwh/depth-anything-v2",
+    "id": "chenxwh/depth-anything-v2:b239ea33cff32bb7abb5db39ffe9a09c14cbc2894331d1ef66fe096eed88ebd4",
     "provider": "replicate",
     "displayName": "Depth Anything v2",
     "family": "depth",
@@ -43,7 +43,7 @@
     "inputs": []
   },
   {
-    "id": "jd7h/zero123plusplus",
+    "id": "jd7h/zero123plusplus:c69c6559a29011b576f1ff0371b3bc1add2856480c60520c7e9ce0b40a6e9052",
     "provider": "replicate",
     "displayName": "Zero123++",
     "family": "views",

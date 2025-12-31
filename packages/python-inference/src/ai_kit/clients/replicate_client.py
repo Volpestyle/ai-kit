@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import random
 import re
 import time
@@ -38,23 +39,38 @@ class ReplicateClient:
         self,
         *,
         use_file_output: bool = True,
-        max_retries: int = 3,
-        base_delay_s: float = 2.0,
-        max_delay_s: float = 30.0,
+        max_retries: Optional[int] = None,
+        base_delay_s: Optional[float] = None,
+        max_delay_s: Optional[float] = None,
+        min_interval_s: Optional[float] = None,
     ):
         self.use_file_output = use_file_output
+        if max_retries is None:
+            max_retries = int(os.getenv("AI_KIT_REPLICATE_MAX_RETRIES", "5"))
+        if base_delay_s is None:
+            base_delay_s = float(os.getenv("AI_KIT_REPLICATE_BASE_DELAY_S", "2"))
+        if max_delay_s is None:
+            max_delay_s = float(os.getenv("AI_KIT_REPLICATE_MAX_DELAY_S", "60"))
+        if min_interval_s is None:
+            min_interval_s = float(os.getenv("AI_KIT_REPLICATE_MIN_INTERVAL_S", "0"))
         self.max_retries = max(0, max_retries)
         self.base_delay_s = max(0.1, base_delay_s)
         self.max_delay_s = max(self.base_delay_s, max_delay_s)
+        self.min_interval_s = max(0.0, min_interval_s)
+        self._next_allowed_ts = 0.0
 
     def run(self, model: str, *, inputs: Dict[str, Any]) -> Any:
         # replicate.run(..., use_file_output=...) is supported in replicate>=1.0.0.
         attempt = 0
+        saw_throttle = False
         while True:
             try:
+                self._throttle_start()
                 return replicate.run(model, input=inputs, use_file_output=self.use_file_output)
             except Exception as exc:
-                if not self._should_retry(exc, attempt):
+                if self._is_throttle(exc):
+                    saw_throttle = True
+                if not self._should_retry(exc, attempt, saw_throttle):
                     raise
                 delay = self._retry_delay(exc, attempt)
                 time.sleep(delay)
@@ -145,23 +161,46 @@ class ReplicateClient:
             return _download_url(out["url"])
         raise TypeError(f"Unsupported Replicate output type: {type(out)}")
 
-    def _should_retry(self, exc: Exception, attempt: int) -> bool:
+    def _should_retry(self, exc: Exception, attempt: int, saw_throttle: bool) -> bool:
         if attempt >= self.max_retries:
             return False
         status = getattr(exc, "status", None) or getattr(exc, "status_code", None)
         if status == 429:
             return True
-        message = str(exc).lower()
+        if status == 404 and saw_throttle:
+            return True
+        message = self._error_message(exc).lower()
         return "429" in message or "throttl" in message or "rate limit" in message
 
     def _retry_delay(self, exc: Exception, attempt: int) -> float:
-        message = str(exc)
+        message = self._error_message(exc)
         match = re.search(r"reset(?:s)? in ~?(\\d+)s", message, re.IGNORECASE)
         if match:
             return min(self.max_delay_s, float(match.group(1)) + 1.0)
         base = min(self.max_delay_s, self.base_delay_s * (2 ** attempt))
         jitter = random.uniform(0, min(1.0, base * 0.1))
         return base + jitter
+
+    def _is_throttle(self, exc: Exception) -> bool:
+        status = getattr(exc, "status", None) or getattr(exc, "status_code", None)
+        if status == 429:
+            return True
+        message = self._error_message(exc).lower()
+        return "throttl" in message or "rate limit" in message
+
+    def _error_message(self, exc: Exception) -> str:
+        detail = getattr(exc, "detail", None)
+        if isinstance(detail, str) and detail:
+            return detail
+        return str(exc)
+
+    def _throttle_start(self) -> None:
+        if self.min_interval_s <= 0:
+            return
+        now = time.monotonic()
+        if self._next_allowed_ts > now:
+            time.sleep(self._next_allowed_ts - now)
+        self._next_allowed_ts = time.monotonic() + self.min_interval_s
 
     @staticmethod
     def split_grid_image(
