@@ -220,12 +220,18 @@ func (a *anthropicAdapter) buildPayload(in GenerateInput, stream bool) map[strin
 		"system":      system,
 		"messages":    messages,
 		"max_tokens":  defaultMaxTokens(in.MaxTokens),
-		"temperature": in.Temperature,
-		"top_p":       in.TopP,
 		"metadata":    in.Metadata,
 		"tools":       convertAnthropicTools(in.Tools),
-		"tool_choice": convertAnthropicToolChoice(in.ToolChoice),
 		"stream":      stream,
+	}
+	if in.Temperature != nil {
+		payload["temperature"] = *in.Temperature
+	}
+	if in.TopP != nil {
+		payload["top_p"] = *in.TopP
+	}
+	if toolChoice := convertAnthropicToolChoice(in.ToolChoice); toolChoice != nil {
+		payload["tool_choice"] = toolChoice
 	}
 	if in.ResponseFormat != nil && in.ResponseFormat.Type == "json_schema" && in.ResponseFormat.JsonSchema != nil {
 		payload["output_format"] = map[string]interface{}{
@@ -364,12 +370,24 @@ func convertAnthropicToolChoice(choice *ToolChoice) interface{} {
 	if choice == nil {
 		return nil
 	}
-	if choice.Type == "auto" || choice.Type == "none" {
-		return choice.Type
-	}
-	return map[string]string{
-		"type": "tool",
-		"name": choice.Name,
+	switch choice.Type {
+	case "auto", "none", "any":
+		return map[string]string{
+			"type": choice.Type,
+		}
+	case "tool":
+		return map[string]string{
+			"type": "tool",
+			"name": choice.Name,
+		}
+	default:
+		out := map[string]string{
+			"type": choice.Type,
+		}
+		if strings.TrimSpace(choice.Name) != "" {
+			out["name"] = choice.Name
+		}
+		return out
 	}
 }
 
