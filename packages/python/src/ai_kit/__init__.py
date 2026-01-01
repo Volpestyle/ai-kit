@@ -100,4 +100,4 @@ _optional(
         "fixture_key",
     ],
 )
-_optional(".clients", ["MeshyClient", "MeshyError", "MeshyTask", "ReplicateClient"])
+_optional(".clients", ["MeshyClient", "MeshyError", "MeshyTask", "ReplicateClient", "FalClient"])

@@ -1,0 +1,94 @@
+[
+  {
+    "id": "tripo3d/tripo/v2.5/multiview-to-3d",
+    "provider": "fal",
+    "displayName": "Tripo3D Multi-view to 3D",
+    "family": "recon",
+    "capabilities": {
+      "text": false,
+      "vision": false,
+      "image": true,
+      "tool_use": false,
+      "structured_output": false,
+      "reasoning": false
+    },
+    "inputs": [
+      {
+        "name": "texture",
+        "label": "Texture",
+        "type": "select",
+        "default": "standard",
+        "options": [
+          { "label": "No texture", "value": "no" },
+          { "label": "Standard", "value": "standard" },
+          { "label": "HD", "value": "HD" }
+        ]
+      },
+      {
+        "name": "pbr",
+        "label": "Enable PBR",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "name": "face_limit",
+        "label": "Face limit",
+        "type": "number",
+        "min": 1000,
+        "max": 200000,
+        "step": 500,
+        "placeholder": "Auto"
+      },
+      {
+        "name": "seed",
+        "label": "Seed",
+        "type": "number",
+        "min": 0,
+        "max": 2147483647,
+        "step": 1,
+        "placeholder": "Random"
+      },
+      {
+        "name": "texture_seed",
+        "label": "Texture seed",
+        "type": "number",
+        "min": 0,
+        "max": 2147483647,
+        "step": 1,
+        "placeholder": "Random"
+      },
+      {
+        "name": "auto_size",
+        "label": "Auto size (meters)",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "name": "quad",
+        "label": "Quad mesh (FBX)",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "name": "texture_alignment",
+        "label": "Texture alignment",
+        "type": "select",
+        "default": "original_image",
+        "options": [
+          { "label": "Original image", "value": "original_image" },
+          { "label": "Geometry", "value": "geometry" }
+        ]
+      },
+      {
+        "name": "orientation",
+        "label": "Orientation",
+        "type": "select",
+        "default": "default",
+        "options": [
+          { "label": "Default", "value": "default" },
+          { "label": "Align image", "value": "align_image" }
+        ]
+      }
+    ]
+  }
+]

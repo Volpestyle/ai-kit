@@ -131,7 +131,11 @@ def load_catalog_models() -> List[ModelMetadata]:
     - Manual provider catalogs (replicate/meshy) are loaded from JSON files.
     """
     models = _load_local_catalog_models()
-    for provider, filename in (("replicate", "replicate_models.json"), ("meshy", "meshy_models.json")):
+    for provider, filename in (
+        ("replicate", "replicate_models.json"),
+        ("meshy", "meshy_models.json"),
+        ("fal", "fal_models.json"),
+    ):
         path = _resolve_models_file(filename)
         if not path:
             continue
