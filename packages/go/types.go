@@ -218,22 +218,31 @@ type TranscriptSegment struct {
 	Text  string  `json:"text"`
 }
 
+type TranscriptWord struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+	Word  string  `json:"word"`
+}
+
 type TranscribeInput struct {
-	Provider    Provider          `json:"provider"`
-	Model       string            `json:"model"`
-	Audio       AudioInput        `json:"audio"`
-	Language    string            `json:"language,omitempty"`
-	Prompt      string            `json:"prompt,omitempty"`
-	Temperature *float64          `json:"temperature,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	Provider               Provider          `json:"provider"`
+	Model                  string            `json:"model"`
+	Audio                  AudioInput        `json:"audio"`
+	Language               string            `json:"language,omitempty"`
+	Prompt                 string            `json:"prompt,omitempty"`
+	Temperature            *float64          `json:"temperature,omitempty"`
+	ResponseFormat         string            `json:"responseFormat,omitempty"`
+	TimestampGranularities []string          `json:"timestampGranularities,omitempty"`
+	Metadata               map[string]string `json:"metadata,omitempty"`
 }
 
 type TranscribeOutput struct {
-	Text     string             `json:"text,omitempty"`
-	Language string             `json:"language,omitempty"`
-	Duration float64            `json:"duration,omitempty"`
+	Text     string              `json:"text,omitempty"`
+	Language string              `json:"language,omitempty"`
+	Duration float64             `json:"duration,omitempty"`
 	Segments []TranscriptSegment `json:"segments,omitempty"`
-	Raw      interface{}        `json:"raw,omitempty"`
+	Words    []TranscriptWord    `json:"words,omitempty"`
+	Raw      interface{}         `json:"raw,omitempty"`
 }
 
 type ToolCall struct {

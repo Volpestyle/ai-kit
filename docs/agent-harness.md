@@ -106,8 +106,10 @@ out, err := kit.Generate(ctx, visionInput)
 ```go
 transcript, err := kit.Transcribe(ctx, aikit.TranscribeInput{
   Provider: aikit.ProviderOpenAI,
-  Model:    "whisper-1",
+  Model:    "gpt-4o-mini-transcribe",
   Audio:    aikit.AudioInput{Path: "/tmp/agent-note.wav"},
+  ResponseFormat:         "verbose_json",
+  TimestampGranularities: []string{"segment", "word"},
 })
 ```
 

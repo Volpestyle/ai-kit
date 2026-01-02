@@ -336,6 +336,21 @@ function normalizeTranscribeInput(payload: unknown): TranscribeInput {
     });
   }
   const input = parsed as Record<string, unknown>;
+  if (
+    typeof input.responseFormat !== "string" &&
+    typeof input.response_format === "string"
+  ) {
+    input.responseFormat = input.response_format;
+  }
+  if (
+    !Array.isArray(input.timestampGranularities) &&
+    input.timestamp_granularities !== undefined
+  ) {
+    input.timestampGranularities =
+      typeof input.timestamp_granularities === "string"
+        ? [input.timestamp_granularities]
+        : input.timestamp_granularities;
+  }
   if (typeof input.provider !== "string") {
     throw new AiKitError({
       kind: ErrorKind.Validation,

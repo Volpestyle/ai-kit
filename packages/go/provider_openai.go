@@ -140,6 +140,12 @@ type openAITranscriptionResponse struct {
 		End   float64 `json:"end"`
 		Text  string  `json:"text"`
 	} `json:"segments"`
+	Words []struct {
+		Start float64 `json:"start"`
+		End   float64 `json:"end"`
+		Word  string  `json:"word"`
+		Text  string  `json:"text"`
+	} `json:"words"`
 }
 
 func (p *openAIResponsesStreamPayload) ErrorCode() string {
@@ -274,7 +280,11 @@ func (a *openAIAdapter) Transcribe(ctx context.Context, in TranscribeInput) (Tra
 	if err := writer.WriteField("model", in.Model); err != nil {
 		return TranscribeOutput{}, err
 	}
-	if err := writer.WriteField("response_format", "verbose_json"); err != nil {
+	responseFormat := strings.TrimSpace(in.ResponseFormat)
+	if responseFormat == "" {
+		responseFormat = "verbose_json"
+	}
+	if err := writer.WriteField("response_format", responseFormat); err != nil {
 		return TranscribeOutput{}, err
 	}
 	if strings.TrimSpace(in.Language) != "" {
@@ -289,6 +299,14 @@ func (a *openAIAdapter) Transcribe(ctx context.Context, in TranscribeInput) (Tra
 	}
 	if in.Temperature != nil {
 		if err := writer.WriteField("temperature", fmt.Sprintf("%g", *in.Temperature)); err != nil {
+			return TranscribeOutput{}, err
+		}
+	}
+	for _, granularity := range in.TimestampGranularities {
+		if strings.TrimSpace(granularity) == "" {
+			continue
+		}
+		if err := writer.WriteField("timestamp_granularities[]", granularity); err != nil {
 			return TranscribeOutput{}, err
 		}
 	}
@@ -315,8 +333,21 @@ func (a *openAIAdapter) Transcribe(ctx context.Context, in TranscribeInput) (Tra
 	a.applyAuthHeaders(req)
 	req.Header.Set("content-type", writer.FormDataContentType())
 
+	resp, err := doRequest(ctx, a.client, req, a.provider)
+	if err != nil {
+		return TranscribeOutput{}, err
+	}
+	defer resp.Body.Close()
+	if responseFormat == "text" || responseFormat == "srt" || responseFormat == "vtt" {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return TranscribeOutput{}, err
+		}
+		text := string(body)
+		return TranscribeOutput{Text: text, Raw: text}, nil
+	}
 	var payload openAITranscriptionResponse
-	if err := doJSON(ctx, a.client, req, a.provider, &payload); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return TranscribeOutput{}, err
 	}
 	output := TranscribeOutput{
@@ -335,6 +366,24 @@ func (a *openAIAdapter) Transcribe(ctx context.Context, in TranscribeInput) (Tra
 			})
 		}
 		output.Segments = segments
+	}
+	if len(payload.Words) > 0 {
+		words := make([]TranscriptWord, 0, len(payload.Words))
+		for _, word := range payload.Words {
+			value := word.Word
+			if value == "" {
+				value = word.Text
+			}
+			if value == "" {
+				continue
+			}
+			words = append(words, TranscriptWord{
+				Start: word.Start,
+				End:   word.End,
+				Word:  value,
+			})
+		}
+		output.Words = words
 	}
 	return output, nil
 }

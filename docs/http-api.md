@@ -57,8 +57,10 @@ curl -X POST http://localhost:3000/transcribe \
   -H 'Content-Type: application/json' \
   -d '{
     "provider": "openai",
-    "model": "whisper-1",
-    "audio": { "base64": "<base64 audio>" }
+    "model": "gpt-4o-mini-transcribe",
+    "audio": { "base64": "<base64 audio>" },
+    "responseFormat": "verbose_json",
+    "timestampGranularities": ["segment", "word"]
   }'
 ```
 

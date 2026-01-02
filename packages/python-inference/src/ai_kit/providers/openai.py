@@ -20,6 +20,7 @@ from ..types import (
     ModelCapabilities,
     ModelMetadata,
     TranscriptSegment,
+    TranscriptWord,
     TranscribeInput,
     TranscribeOutput,
     Provider,
@@ -130,9 +131,10 @@ class OpenAIAdapter:
     def transcribe(self, input: TranscribeInput) -> TranscribeOutput:
         audio_bytes, filename, media_type = _load_audio_input(input.audio)
         url = f"{self.base_url}/v1/audio/transcriptions"
+        response_format = input.responseFormat or "verbose_json"
         data: Dict[str, Any] = {
             "model": input.model,
-            "response_format": "verbose_json",
+            "response_format": response_format,
         }
         if input.language:
             data["language"] = input.language
@@ -140,6 +142,11 @@ class OpenAIAdapter:
             data["prompt"] = input.prompt
         if input.temperature is not None:
             data["temperature"] = input.temperature
+        if input.timestampGranularities:
+            if isinstance(input.timestampGranularities, str):
+                data["timestamp_granularities[]"] = [input.timestampGranularities]
+            else:
+                data["timestamp_granularities[]"] = input.timestampGranularities
         payload = request_multipart(
             "POST",
             url,
@@ -147,7 +154,10 @@ class OpenAIAdapter:
             data=data,
             file_field=("file", (filename, audio_bytes, media_type)),
             timeout=self.config.timeout,
+            expect_json=response_format not in ("text", "srt", "vtt"),
         )
+        if isinstance(payload, str):
+            return TranscribeOutput(text=payload, raw=payload)
         return _normalize_transcription_output(payload)
 
     def stream_generate(self, input: GenerateInput) -> Iterable[StreamChunk]:
@@ -500,11 +510,27 @@ def _normalize_transcription_output(payload: Dict[str, Any]) -> TranscribeOutput
                 text=text,
             )
         )
+    words_raw = payload.get("words") or []
+    words: List[TranscriptWord] = []
+    for word in words_raw:
+        if not isinstance(word, dict):
+            continue
+        token = word.get("word") or word.get("text")
+        if not isinstance(token, str):
+            continue
+        words.append(
+            TranscriptWord(
+                start=float(word.get("start") or 0),
+                end=float(word.get("end") or 0),
+                word=token,
+            )
+        )
     return TranscribeOutput(
         text=payload.get("text"),
         language=payload.get("language"),
         duration=payload.get("duration"),
         segments=segments or None,
+        words=words or None,
         raw=payload,
     )
 

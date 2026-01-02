@@ -331,6 +331,13 @@ components:
         start: { type: number }
         end: { type: number }
         text: { type: string }
+    TranscriptWord:
+      type: object
+      required: [start, end, word]
+      properties:
+        start: { type: number }
+        end: { type: number }
+        word: { type: string }
     TranscribeInput:
       type: object
       required: [provider, model, audio]
@@ -343,6 +350,14 @@ components:
         language: { type: string }
         prompt: { type: string }
         temperature: { type: number }
+        responseFormat:
+          type: string
+          enum: [json, text, srt, verbose_json, vtt]
+        timestampGranularities:
+          type: array
+          items:
+            type: string
+            enum: [word, segment]
         metadata:
           type: object
           additionalProperties:
@@ -357,6 +372,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TranscriptSegment'
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptWord'
         raw:
           type: object
           additionalProperties: true

@@ -13,6 +13,8 @@ export type {
   TranscribeInput,
   TranscribeOutput,
   TranscriptSegment,
+  TranscriptWord,
+  TranscribeResponseFormat,
   AudioInput,
   CostBreakdown,
   StreamChunk,

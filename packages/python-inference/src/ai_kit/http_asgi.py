@@ -336,6 +336,14 @@ def _normalize_transcribe_input(payload: Any) -> TranscribeInput:
         raise AiKitError(
             KitErrorPayload(kind=ErrorKind.VALIDATION, message="audio is required and must be an object")
         )
+    response_format = payload.get("responseFormat")
+    if response_format is None:
+        response_format = payload.get("response_format")
+    timestamp_granularities = payload.get("timestampGranularities")
+    if timestamp_granularities is None:
+        timestamp_granularities = payload.get("timestamp_granularities")
+    if isinstance(timestamp_granularities, str):
+        timestamp_granularities = [timestamp_granularities]
     return TranscribeInput(
         provider=provider,
         model=model,
@@ -343,6 +351,8 @@ def _normalize_transcribe_input(payload: Any) -> TranscribeInput:
         language=payload.get("language"),
         prompt=payload.get("prompt"),
         temperature=payload.get("temperature"),
+        responseFormat=response_format,
+        timestampGranularities=timestamp_granularities,
         metadata=payload.get("metadata"),
     )
 

@@ -242,6 +242,13 @@ class TranscriptSegment:
 
 
 @dataclass
+class TranscriptWord:
+    start: float
+    end: float
+    word: str
+
+
+@dataclass
 class TranscribeInput:
     provider: Provider
     model: str
@@ -249,6 +256,8 @@ class TranscribeInput:
     language: Optional[str] = None
     prompt: Optional[str] = None
     temperature: Optional[float] = None
+    responseFormat: Optional[str] = None
+    timestampGranularities: Optional[List[str]] = None
     metadata: Optional[Dict[str, str]] = None
 
 
@@ -258,6 +267,7 @@ class TranscribeOutput:
     language: Optional[str] = None
     duration: Optional[float] = None
     segments: Optional[List[TranscriptSegment]] = None
+    words: Optional[List[TranscriptWord]] = None
     raw: Optional[Any] = None
 
 

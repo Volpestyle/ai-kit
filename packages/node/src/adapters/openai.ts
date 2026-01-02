@@ -15,6 +15,7 @@ import {
   ToolCall,
   ToolDefinition,
   TranscriptSegment,
+  TranscriptWord,
   TranscribeInput,
   TranscribeOutput,
   Usage,
@@ -42,6 +43,12 @@ interface OpenAITranscriptionResponse {
   segments?: Array<{
     start?: number;
     end?: number;
+    text?: string;
+  }>;
+  words?: Array<{
+    start?: number;
+    end?: number;
+    word?: string;
     text?: string;
   }>;
 }
@@ -248,7 +255,8 @@ export class OpenAIAdapter implements ProviderAdapter {
     const audio = await this.loadAudioInput(input.audio);
     const form = new FormData();
     form.append("model", input.model);
-    form.append("response_format", "verbose_json");
+    const responseFormat = input.responseFormat ?? "verbose_json";
+    form.append("response_format", responseFormat);
     if (input.language) {
       form.append("language", input.language);
     }
@@ -258,18 +266,36 @@ export class OpenAIAdapter implements ProviderAdapter {
     if (typeof input.temperature === "number") {
       form.append("temperature", String(input.temperature));
     }
+    const timestampGranularities = Array.isArray(input.timestampGranularities)
+      ? input.timestampGranularities
+      : typeof input.timestampGranularities === "string"
+        ? [input.timestampGranularities]
+        : [];
+    if (timestampGranularities.length) {
+      for (const granularity of timestampGranularities) {
+        if (granularity) {
+          form.append("timestamp_granularities[]", granularity);
+        }
+      }
+    }
     form.append("file", new Blob([audio.data], { type: audio.mediaType }), audio.fileName);
 
-    const response = await this.fetchForm<OpenAITranscriptionResponse>(
-      "/v1/audio/transcriptions",
-      form,
-    );
+    const response = await this.fetchRaw("/v1/audio/transcriptions", {
+      method: "POST",
+      body: form,
+    });
+    if (responseFormat === "text" || responseFormat === "srt" || responseFormat === "vtt") {
+      const text = await response.text();
+      return { text, raw: text };
+    }
+    const payload = (await response.json()) as OpenAITranscriptionResponse;
     return {
-      text: response.text,
-      language: response.language,
-      duration: response.duration,
-      segments: this.normalizeSegments(response.segments),
-      raw: response,
+      text: payload.text,
+      language: payload.language,
+      duration: payload.duration,
+      segments: this.normalizeSegments(payload.segments),
+      words: this.normalizeWords(payload.words),
+      raw: payload,
     };
   }
 
@@ -634,15 +660,6 @@ export class OpenAIAdapter implements ProviderAdapter {
     return response;
   }
 
-  private async fetchForm<T>(path: string, body: FormData): Promise<T> {
-    const response = await this.fetchRaw(path, {
-      method: "POST",
-      body,
-    });
-    const json = await response.json();
-    return json as T;
-  }
-
   private normalizeSegments(
     segments?: OpenAITranscriptionResponse["segments"],
   ): TranscriptSegment[] | undefined {
@@ -656,6 +673,21 @@ export class OpenAIAdapter implements ProviderAdapter {
         end: segment.end ?? 0,
         text: segment.text ?? "",
       }));
+  }
+
+  private normalizeWords(
+    words?: OpenAITranscriptionResponse["words"],
+  ): TranscriptWord[] | undefined {
+    if (!words?.length) {
+      return undefined;
+    }
+    return words
+      .map((word) => ({
+        start: word.start ?? 0,
+        end: word.end ?? 0,
+        word: word.word ?? word.text ?? "",
+      }))
+      .filter((word) => word.word);
   }
 
   private async loadAudioInput(input: AudioInput): Promise<{

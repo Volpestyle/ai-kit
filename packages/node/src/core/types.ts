@@ -298,6 +298,19 @@ export interface TranscriptSegment {
   text: string;
 }
 
+export interface TranscriptWord {
+  start: number;
+  end: number;
+  word: string;
+}
+
+export type TranscribeResponseFormat =
+  | "json"
+  | "text"
+  | "srt"
+  | "verbose_json"
+  | "vtt";
+
 export interface TranscribeInput {
   provider: Provider;
   model: string;
@@ -305,6 +318,8 @@ export interface TranscribeInput {
   language?: string;
   prompt?: string;
   temperature?: number;
+  responseFormat?: TranscribeResponseFormat;
+  timestampGranularities?: Array<"word" | "segment">;
   metadata?: Record<string, string>;
 }
 
@@ -313,6 +328,7 @@ export interface TranscribeOutput {
   language?: string;
   duration?: number;
   segments?: TranscriptSegment[];
+  words?: TranscriptWord[];
   raw?: unknown;
 }
 

@@ -69,7 +69,8 @@ def request_multipart(
     data: Optional[Dict[str, Any]] = None,
     file_field: Optional[Tuple[str, Tuple[str, bytes, str]]] = None,
     timeout: Optional[float] = None,
-) -> Dict[str, Any]:
+    expect_json: bool = True,
+) -> Any:
     files = None
     if file_field:
         field_name, file_tuple = file_field
@@ -92,4 +93,6 @@ def request_multipart(
                 upstreamStatus=response.status_code,
             )
         )
-    return response.json()
+    if expect_json:
+        return response.json()
+    return response.text
