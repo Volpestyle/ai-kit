@@ -11,7 +11,12 @@ paths:
           name: providers
           schema:
             type: string
-            description: Comma separated provider ids (openai, anthropic, google, xai, ollama)
+          description: Comma-separated provider ids (openai, anthropic, google, xai, ollama, local)
+        - in: query
+          name: refresh
+          schema:
+            type: boolean
+          description: When true, bypass the registry cache.
       responses:
         '200':
           description: Successful response
@@ -103,6 +108,9 @@ paths:
                 type: string
 components:
   schemas:
+    Provider:
+      type: string
+      enum: [openai, anthropic, google, xai, ollama, local]
     ModelMetadata:
       type: object
       required: [id, displayName, provider, capabilities]
@@ -112,8 +120,7 @@ components:
         displayName:
           type: string
         provider:
-          type: string
-          enum: [openai, anthropic, google, xai, ollama, local]
+          $ref: '#/components/schemas/Provider'
         family:
           type: string
         capabilities:
@@ -121,19 +128,19 @@ components:
           properties:
             text: { type: boolean }
             vision: { type: boolean }
+            image: { type: boolean }
             tool_use: { type: boolean }
             structured_output: { type: boolean }
             reasoning: { type: boolean }
         contextWindow:
           type: integer
         tokenPrices:
-          type: object
-          properties:
-            input: { type: number }
-            output: { type: number }
+          $ref: '#/components/schemas/TokenPrices'
         deprecated:
           type: boolean
         inPreview:
+          type: boolean
+        available:
           type: boolean
     ContentPart:
       type: object
@@ -162,6 +169,8 @@ components:
             $ref: '#/components/schemas/ContentPart'
         toolCallId:
           type: string
+        name:
+          type: string
     ToolDefinition:
       type: object
       required: [name, parameters]
@@ -169,6 +178,52 @@ components:
         name: { type: string }
         description: { type: string }
         parameters: { type: object }
+    ToolChoice:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [auto, none, tool]
+        name:
+          type: string
+    JsonSchemaFormat:
+      type: object
+      required: [name, schema]
+      properties:
+        name: { type: string }
+        schema:
+          type: object
+          additionalProperties: true
+        strict: { type: boolean }
+    ResponseFormat:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [text, json_schema]
+        jsonSchema:
+          $ref: '#/components/schemas/JsonSchemaFormat'
+    TokenPrices:
+      type: object
+      properties:
+        input: { type: number }
+        output: { type: number }
+    Usage:
+      type: object
+      properties:
+        inputTokens: { type: integer }
+        outputTokens: { type: integer }
+        totalTokens: { type: integer }
+    CostBreakdown:
+      type: object
+      properties:
+        input_cost_usd: { type: number }
+        output_cost_usd: { type: number }
+        total_cost_usd: { type: number }
+        pricing_per_million:
+          $ref: '#/components/schemas/TokenPrices'
     ImageInput:
       type: object
       properties:
@@ -187,7 +242,8 @@ components:
       type: object
       required: [provider, model, messages]
       properties:
-        provider: { type: string }
+        provider:
+          $ref: '#/components/schemas/Provider'
         model: { type: string }
         messages:
           type: array
@@ -197,8 +253,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ToolDefinition'
+        toolChoice:
+          $ref: '#/components/schemas/ToolChoice'
         responseFormat:
-          type: object
+          $ref: '#/components/schemas/ResponseFormat'
         temperature:
           type: number
         topP:
@@ -215,7 +273,8 @@ components:
       type: object
       required: [provider, model, prompt]
       properties:
-        provider: { type: string }
+        provider:
+          $ref: '#/components/schemas/Provider'
         model: { type: string }
         prompt: { type: string }
         size: { type: string }
@@ -223,6 +282,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ImageInput'
+        parameters:
+          type: object
+          additionalProperties: true
     ImageGenerateOutput:
       type: object
       required: [mime, data]
@@ -237,11 +299,15 @@ components:
             properties:
               mime: { type: string }
               data: { type: string }
+        raw:
+          type: object
+          additionalProperties: true
     MeshGenerateInput:
       type: object
       required: [provider, model, prompt]
       properties:
-        provider: { type: string }
+        provider:
+          $ref: '#/components/schemas/Provider'
         model: { type: string }
         prompt: { type: string }
         format: { type: string }
@@ -255,6 +321,9 @@ components:
       properties:
         data: { type: string }
         format: { type: string }
+        raw:
+          type: object
+          additionalProperties: true
     TranscriptSegment:
       type: object
       required: [start, end, text]
@@ -266,7 +335,8 @@ components:
       type: object
       required: [provider, model, audio]
       properties:
-        provider: { type: string }
+        provider:
+          $ref: '#/components/schemas/Provider'
         model: { type: string }
         audio:
           $ref: '#/components/schemas/AudioInput'
@@ -287,6 +357,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TranscriptSegment'
+        raw:
+          type: object
+          additionalProperties: true
     ToolCall:
       type: object
       properties:
@@ -302,10 +375,11 @@ components:
           items:
             $ref: '#/components/schemas/ToolCall'
         usage:
-          type: object
-          properties:
-            inputTokens: { type: integer }
-            outputTokens: { type: integer }
-            totalTokens: { type: integer }
+          $ref: '#/components/schemas/Usage'
         finishReason:
           type: string
+        cost:
+          $ref: '#/components/schemas/CostBreakdown'
+        raw:
+          type: object
+          additionalProperties: true
