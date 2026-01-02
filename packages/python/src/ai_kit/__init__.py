@@ -74,6 +74,7 @@ def _optional(module_path: str, names: list[str]) -> None:
 
 _optional(".hub", ["Kit", "KitConfig"])
 _optional(".router", ["ModelRouter"])
+_optional(".kit_cache", ["get_cached_kit", "list_provider_models"])
 _optional(
     ".providers",
     [
